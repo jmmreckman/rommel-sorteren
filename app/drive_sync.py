@@ -1,13 +1,19 @@
 import io
+import logging
 import os
 from pathlib import Path
 
+import pillow_heif
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from PIL import Image, ImageOps
 
 from .db import get_db
+
+pillow_heif.register_heif_opener()  # zodat HEIC/HEIF-foto's (standaard op recente telefoons) ook werken
+
+logger = logging.getLogger("rommel")
 
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 THUMB_DIR = Path(__file__).resolve().parent.parent / "data" / "thumbs"
@@ -72,12 +78,18 @@ def sync_drive() -> dict:
             skipped += 1
             continue
 
-        raw = _download_bytes(service, f["id"])
-        small_path = THUMB_DIR / f"{f['id']}_s.webp"
-        medium_path = THUMB_DIR / f"{f['id']}_m.webp"
-        _make_thumb(raw, small_path, SMALL_SIZE)
-        _make_thumb(raw, medium_path, MEDIUM_SIZE)
-        del raw  # nooit het volledige origineel bewaren, alleen de thumbnails
+        try:
+            raw = _download_bytes(service, f["id"])
+            small_path = THUMB_DIR / f"{f['id']}_s.webp"
+            medium_path = THUMB_DIR / f"{f['id']}_m.webp"
+            _make_thumb(raw, small_path, SMALL_SIZE)
+            _make_thumb(raw, medium_path, MEDIUM_SIZE)
+            del raw  # nooit het volledige origineel bewaren, alleen de thumbnails
+        except Exception:
+            # Eén onleesbare/onverwachte foto mag de rest van de sync niet
+            # blokkeren - overslaan en bij de volgende ronde opnieuw proberen.
+            logger.exception("Foto '%s' (%s) kon niet verwerkt worden, overgeslagen", f.get("name"), f["id"])
+            continue
 
         with get_db() as conn:
             conn.execute(

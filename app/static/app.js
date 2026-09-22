@@ -22,3 +22,12 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 1600);
 }
+
+async function verwijderFoto(photoId) {
+  if (!confirm('Deze foto definitief verwijderen? Dit kan niet ongedaan gemaakt worden.')) {
+    return false;
+  }
+  await api(`/api/photos/${photoId}`, { method: 'DELETE' });
+  showToast('Foto verwijderd');
+  return true;
+}

@@ -195,6 +195,18 @@ def api_stats(user: str = Depends(current_user)):
     }
 
 
+@app.delete("/api/photos/{photo_id}")
+def api_delete_photo(photo_id: int):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "foto niet gevonden")
+        conn.execute("DELETE FROM photos WHERE id=?", (photo_id,))
+    for rel_path in (row["thumb_small"], row["thumb_medium"]):
+        (DATA_DIR / rel_path).unlink(missing_ok=True)
+    return {"ok": True}
+
+
 @app.get("/api/queue")
 def api_queue(limit: int = 6, user: str = Depends(current_user)):
     partner = other_user(user)

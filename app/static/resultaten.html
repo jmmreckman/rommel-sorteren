@@ -42,6 +42,23 @@ function toonGroep(i) {
     a.rel = 'noopener';
     a.innerHTML = `<img src="/${p.thumb_small}" alt="${p.filename}">`;
     fig.appendChild(a);
+
+    const del = document.createElement('button');
+    del.className = 'delete-overlay';
+    del.textContent = '×';
+    del.title = 'Foto verwijderen';
+    del.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!(await verwijderFoto(p.id))) return;
+      groepen = await api('/api/resultaten');
+      document.querySelectorAll('#tabs button').forEach((b, idx) => {
+        b.textContent = `${groepen[idx].category.name} (${groepen[idx].photos.length})`;
+      });
+      toonGroep(actief);
+    });
+    fig.appendChild(del);
+
     if (p.person_name) {
       const cap = document.createElement('figcaption');
       cap.textContent = p.person_name;

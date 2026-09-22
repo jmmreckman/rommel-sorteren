@@ -55,6 +55,13 @@ function catRow(items) {
     acties.appendChild(b);
   });
 
+  const delBtn = document.createElement('button');
+  delBtn.textContent = '🗑 verwijderen';
+  delBtn.addEventListener('click', async () => {
+    if (await verwijderFoto(items.id)) laad();
+  });
+  acties.appendChild(delBtn);
+
   return el;
 }
 
