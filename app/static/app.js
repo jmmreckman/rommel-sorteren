@@ -31,3 +31,28 @@ async function verwijderFoto(photoId) {
   showToast('Foto verwijderd');
   return true;
 }
+
+// Maakt een tags-invoerveld dat vanzelf opslaat zodra je 'm verlaat of Enter drukt.
+function maakTagInput(photoId, tags) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'tag-edit';
+  input.placeholder = 'tags toevoegen...';
+  input.value = tags || '';
+  input.dataset.lastSaved = tags || '';
+  const opslaan = async () => {
+    const nieuw = input.value.trim();
+    if (nieuw === input.dataset.lastSaved) return;
+    try {
+      await api(`/api/photos/${photoId}/tags`, { method: 'PATCH', body: JSON.stringify({ tags: nieuw }) });
+      input.dataset.lastSaved = nieuw;
+      showToast('Tags opgeslagen');
+    } catch (e) {
+      showToast('Opslaan mislukt');
+    }
+  };
+  input.addEventListener('blur', opslaan);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
+  input.addEventListener('click', (e) => e.stopPropagation());
+  return input;
+}

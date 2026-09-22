@@ -163,6 +163,16 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
   margin-bottom: 10px;
 }
 
+.tag-edit {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
 .delete-link {
   display: block;
   text-align: center;
@@ -237,6 +247,7 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
   border-radius: 10px;
 }
 .grid figure { margin: 0; position: relative; }
+.grid figure .tag-edit { margin-top: 4px; }
 .grid figcaption { font-size: 0.7rem; color: var(--muted); text-align: center; margin-top: 2px; }
 
 .empty { text-align: center; padding: 40px 10px; color: var(--muted); }

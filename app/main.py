@@ -211,6 +211,20 @@ def api_delete_photo(photo_id: int):
     return {"ok": True}
 
 
+class TagsIn(BaseModel):
+    tags: str = ""
+
+
+@app.patch("/api/photos/{photo_id}/tags")
+def api_update_tags(photo_id: int, body: TagsIn):
+    with get_db() as conn:
+        row = conn.execute("SELECT id FROM photos WHERE id=?", (photo_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "foto niet gevonden")
+        conn.execute("UPDATE photos SET tags=? WHERE id=?", (body.tags.strip(), photo_id))
+    return {"ok": True, "tags": body.tags.strip()}
+
+
 @app.post("/api/photos/upload")
 async def api_upload_photo(file: UploadFile = File(...), tags: str = Form("")):
     raw = await file.read()
@@ -364,6 +378,7 @@ def api_overleg(user: str = Depends(current_user)):
             "filename": r["filename"],
             "thumb_small": r["thumb_small"],
             "thumb_medium": r["thumb_medium"],
+            "tags": r["tags"],
             "mine": {"category": cats[a["category_id"]]["name"], "color": cats[a["category_id"]]["color"], "person_name": a["person_name"]},
             "theirs": {"category": cats[b["category_id"]]["name"], "color": cats[b["category_id"]]["color"], "person_name": b["person_name"]},
         })
@@ -416,6 +431,7 @@ def api_resultaten():
             "thumb_medium": r["thumb_medium"],
             "drive_link": r["drive_link"],
             "person_name": r["name_a"],
+            "tags": r["tags"],
         })
     return list(grouped.values())
 

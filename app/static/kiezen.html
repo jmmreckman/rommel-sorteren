@@ -19,6 +19,7 @@
       <img id="foto" alt="">
       <div class="matchbanner" id="matchbanner"></div>
     </div>
+    <div id="tagswrap" style="margin-bottom:12px;"></div>
     <div class="catgrid" id="catgrid"></div>
     <div class="namebox" id="namebox">
       <input type="text" id="naaminput" placeholder="Naam van wie het krijgt" list="naamlijst">
@@ -125,6 +126,9 @@ function toonVolgende() {
   const foto = queue[0];
   document.getElementById('foto').src = '/' + foto.thumb_medium;
   renderPartnerTag(foto);
+  const tagswrap = document.getElementById('tagswrap');
+  tagswrap.innerHTML = '';
+  tagswrap.appendChild(maakTagInput(foto.id, foto.tags));
   // volgende foto alvast preloaden voor een soepele overgang
   if (queue[1]) { new Image().src = '/' + queue[1].thumb_medium; }
 }

@@ -58,6 +58,7 @@ function toonGroep(i) {
       toonGroep(actief);
     });
     fig.appendChild(del);
+    fig.appendChild(maakTagInput(p.id, p.tags));
 
     if (p.person_name) {
       const cap = document.createElement('figcaption');
