@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Rommel Sorteren — inloggen</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>🧹 Rommel Sorteren</h1>
+  <p class="muted">Wie ben je?</p>
+  <form method="post" action="/login">
+    <div class="userpicker" id="userpicker">
+      <button type="button" data-user="ayla">Ayla</button>
+      <button type="button" data-user="jurian">Jurian</button>
+    </div>
+    <input type="hidden" name="user" id="userfield">
+    <div class="card" style="margin-top:14px;">
+      <input type="password" name="password" placeholder="Wachtwoord" required
+        style="width:100%;padding:14px;font-size:1rem;border-radius:10px;border:1px solid var(--border);">
+    </div>
+    <p id="foutmelding" class="muted" style="color:var(--cat4); display:none;">Naam of wachtwoord klopt niet.</p>
+    <button type="submit" class="btn">Inloggen</button>
+  </form>
+</div>
+<script>
+  const buttons = document.querySelectorAll('#userpicker button');
+  const field = document.getElementById('userfield');
+  buttons.forEach(b => b.addEventListener('click', () => {
+    buttons.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    field.value = b.dataset.user;
+  }));
+  if (new URLSearchParams(location.search).get('fout')) {
+    document.getElementById('foutmelding').style.display = 'block';
+  }
+  document.querySelector('form').addEventListener('submit', (e) => {
+    if (!field.value) { e.preventDefault(); alert('Kies eerst je naam.'); }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Het overleg — Rommel Sorteren</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/">&larr; hoofdpagina</a>
+  </div>
+  <h1>🤝 Het overleg</h1>
+  <p class="muted">Hier staan foto's waar jullie een andere keuze voor maakten. Neem de keuze van je partner over, of kies opnieuw om van mening te wisselen.</p>
+  <div id="lijst"></div>
+  <div class="empty" id="leeg" style="display:none;">Niks te overleggen — alles is het eens! 🎉</div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/assets/app.js"></script>
+<script>
+let categories = [];
+
+function catRow(items) {
+  const el = document.createElement('div');
+  el.className = 'card overleg-item';
+  const cat = document.createElement('div');
+  cat.style.flex = '1';
+  el.innerHTML = `<img src="/${items.thumb_small}" alt="">`;
+  const info = document.createElement('div');
+  info.style.flex = '1';
+  const mijnNaam = items.mine.person_name ? ` (${items.mine.person_name})` : '';
+  const partnerNaam = items.theirs.person_name ? ` (${items.theirs.person_name})` : '';
+  info.innerHTML = `
+    <div class="overleg-choices">
+      Jij koos: <span class="mine">${items.mine.category}${mijnNaam}</span><br>
+      Je partner koos: <span class="theirs">${items.theirs.category}${partnerNaam}</span>
+    </div>
+    <div class="overleg-actions" id="acties-${items.id}"></div>
+  `;
+  el.appendChild(info);
+
+  const acties = info.querySelector(`#acties-${items.id}`);
+  const overnemenBtn = document.createElement('button');
+  overnemenBtn.textContent = `Neem "${items.theirs.category}" over`;
+  overnemenBtn.addEventListener('click', () => adopt(items.id));
+  acties.appendChild(overnemenBtn);
+
+  categories.forEach(c => {
+    const b = document.createElement('button');
+    b.textContent = `Kies: ${c.name}`;
+    b.addEventListener('click', () => opnieuwKiezen(items.id, c));
+    acties.appendChild(b);
+  });
+
+  return el;
+}
+
+async function adopt(photoId) {
+  await api(`/api/overleg/${photoId}/adopt`, { method: 'POST' });
+  showToast('Overgenomen');
+  laad();
+}
+
+async function opnieuwKiezen(photoId, cat) {
+  let naam = null;
+  if (cat.requires_name) {
+    naam = prompt('Naam van wie het krijgt:');
+    if (!naam) return;
+  }
+  await api('/api/choice', {
+    method: 'POST',
+    body: JSON.stringify({ photo_id: photoId, category_id: cat.id, person_name: naam }),
+  });
+  showToast('Keuze aangepast');
+  laad();
+}
+
+async function laad() {
+  const lijst = await api('/api/overleg');
+  const el = document.getElementById('lijst');
+  el.innerHTML = '';
+  document.getElementById('leeg').style.display = lijst.length ? 'none' : 'block';
+  lijst.forEach(item => el.appendChild(catRow(item)));
+}
+
+(async function init() {
+  categories = await api('/api/categories');
+  laad();
+})();
+</script>
+</body>
+</html>

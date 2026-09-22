@@ -1,0 +1,11 @@
+services:
+  rommel:
+    build: .
+    container_name: rommel-sorteren
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./credentials.json:/app/credentials.json:ro
+    ports:
+      - "127.0.0.1:8123:8000"

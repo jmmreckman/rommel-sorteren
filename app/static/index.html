@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Rommel Sorteren</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span class="muted" id="wie">...</span>
+    <a href="/logout">uitloggen</a>
+  </div>
+  <h1>🧹 Rommel Sorteren</h1>
+  <p class="muted" id="voortgangtekst">Bezig met laden...</p>
+  <div class="progress"><div id="voortgangbalk" style="width:0%"></div></div>
+
+  <div class="card" style="margin-top:18px;">
+    <a class="btn" href="/kiezen">📸 Foto's categoriseren<span class="badge" id="badge-queue" style="display:none;"></span></a>
+    <a class="btn secondary" href="/overleg">🤝 Het overleg<span class="badge" id="badge-overleg" style="display:none;"></span></a>
+    <a class="btn secondary" href="/resultaten">✅ Resultaten</a>
+  </div>
+
+  <div class="card">
+    <h2>Status</h2>
+    <p class="muted" id="stat-total">—</p>
+    <p class="muted" id="stat-mine">—</p>
+    <p class="muted" id="stat-partner">—</p>
+    <p class="muted" id="stat-resolved">—</p>
+  </div>
+
+  <div class="card">
+    <h2>Nieuwe foto's ophalen</h2>
+    <p class="muted">Haalt nieuwe foto's op uit de gedeelde Google Drive-map.</p>
+    <button class="btn secondary" id="syncbtn">🔄 Ververs vanuit Drive</button>
+    <p class="muted" id="syncstatus"></p>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/assets/app.js"></script>
+<script>
+async function laad() {
+  const me = await api('/api/me');
+  document.getElementById('wie').textContent = 'Ingelogd als ' + (me.user === 'ayla' ? 'Ayla' : 'Jurian');
+
+  const s = await api('/api/stats');
+  const pct = s.total ? Math.round((s.resolved / s.total) * 100) : 0;
+  document.getElementById('voortgangtekst').textContent =
+    s.total === 0 ? 'Nog geen foto\'s geladen.' : `${s.resolved} van ${s.total} foto's definitief verdeeld (${pct}%)`;
+  document.getElementById('voortgangbalk').style.width = pct + '%';
+
+  document.getElementById('stat-total').textContent = `📷 Totaal aantal foto's: ${s.total}`;
+  document.getElementById('stat-mine').textContent = `👉 Nog te kiezen door jou: ${s.my_queue}`;
+  document.getElementById('stat-partner').textContent = `⏳ Wachten op je partner: ${s.waiting_for_partner}`;
+  document.getElementById('stat-resolved').textContent = `🗣️ In het overleg: ${s.overleg}`;
+
+  if (s.my_queue > 0) {
+    const b = document.getElementById('badge-queue');
+    b.textContent = s.my_queue; b.style.display = 'inline-block';
+  }
+  if (s.overleg > 0) {
+    const b = document.getElementById('badge-overleg');
+    b.textContent = s.overleg; b.style.display = 'inline-block';
+  }
+}
+laad();
+
+document.getElementById('syncbtn').addEventListener('click', async () => {
+  const btn = document.getElementById('syncbtn');
+  btn.disabled = true;
+  document.getElementById('syncstatus').textContent = 'Bezig met ophalen, dit kan even duren...';
+  try {
+    const r = await api('/api/sync', { method: 'POST' });
+    document.getElementById('syncstatus').textContent = `Klaar: ${r.added} nieuwe foto's toegevoegd.`;
+    laad();
+  } catch (e) {
+    document.getElementById('syncstatus').textContent = 'Mislukt: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

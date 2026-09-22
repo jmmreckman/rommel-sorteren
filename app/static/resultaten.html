@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Resultaten — Rommel Sorteren</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/">&larr; hoofdpagina</a>
+  </div>
+  <h1>✅ Resultaten</h1>
+  <div class="tabs" id="tabs"></div>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="leeg" style="display:none;">Nog geen definitieve foto's in deze categorie.</div>
+</div>
+<script src="/assets/app.js"></script>
+<script>
+let groepen = [];
+let actief = 0;
+
+function toonGroep(i) {
+  actief = i;
+  document.querySelectorAll('#tabs button').forEach((b, idx) => b.classList.toggle('active', idx === i));
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  const photos = groepen[i].photos;
+  document.getElementById('leeg').style.display = photos.length ? 'none' : 'block';
+  photos.forEach(p => {
+    const fig = document.createElement('figure');
+    const a = document.createElement('a');
+    a.href = p.drive_link || ('/' + p.thumb_medium);
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.innerHTML = `<img src="/${p.thumb_small}" alt="${p.filename}">`;
+    fig.appendChild(a);
+    if (p.person_name) {
+      const cap = document.createElement('figcaption');
+      cap.textContent = p.person_name;
+      fig.appendChild(cap);
+    }
+    grid.appendChild(fig);
+  });
+}
+
+(async function init() {
+  groepen = await api('/api/resultaten');
+  const tabs = document.getElementById('tabs');
+  groepen.forEach((g, i) => {
+    const b = document.createElement('button');
+    b.textContent = `${g.category.name} (${g.photos.length})`;
+    b.addEventListener('click', () => toonGroep(i));
+    tabs.appendChild(b);
+  });
+  if (groepen.length) toonGroep(0);
+})();
+</script>
+</body>
+</html>

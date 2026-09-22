@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Foto's categoriseren — Rommel Sorteren</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/">&larr; hoofdpagina</a>
+    <span class="muted" id="teller"></span>
+  </div>
+
+  <div id="stage-wrap">
+    <div class="photo-stage"><img id="foto" alt=""></div>
+    <div class="catgrid" id="catgrid"></div>
+    <div class="namebox" id="namebox">
+      <input type="text" id="naaminput" placeholder="Naam van wie het krijgt" list="naamlijst">
+      <datalist id="naamlijst"></datalist>
+      <button class="btn" id="bevestignaam">Bevestigen</button>
+    </div>
+  </div>
+
+  <div class="card" id="klaarcard" style="display:none;">
+    <div class="empty">
+      🎉 Je hebt alle foto's beoordeeld!<br>
+      <a href="/overleg">Bekijk het overleg</a> of ga naar de <a href="/resultaten">resultaten</a>.
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px;">
+    <button class="btn secondary" id="toon-nieuwe-cat">+ Nieuwe categorie toevoegen</button>
+    <div id="nieuwe-cat-form" style="display:none; margin-top:10px;">
+      <input type="text" id="nieuwe-cat-naam" placeholder="Naam van de nieuwe categorie"
+        style="width:100%;padding:12px;font-size:1rem;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;">
+      <button class="btn" id="nieuwe-cat-opslaan">Toevoegen</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/assets/app.js"></script>
+<script>
+let categories = [];
+let queue = [];
+let pendingCategoryId = null;
+
+function renderCatgrid() {
+  const grid = document.getElementById('catgrid');
+  grid.innerHTML = '';
+  categories.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'catbtn';
+    b.style.background = colorForIndex(i);
+    b.textContent = c.name;
+    b.addEventListener('click', () => chooseCategory(c));
+    grid.appendChild(b);
+  });
+}
+
+function chooseCategory(cat) {
+  if (cat.requires_name) {
+    pendingCategoryId = cat.id;
+    document.getElementById('namebox').classList.add('show');
+    document.getElementById('naaminput').value = '';
+    document.getElementById('naaminput').focus();
+  } else {
+    submitChoice(cat.id, null);
+  }
+}
+
+async function submitChoice(categoryId, personName) {
+  const photo = queue.shift();
+  document.getElementById('namebox').classList.remove('show');
+  await api('/api/choice', {
+    method: 'POST',
+    body: JSON.stringify({ photo_id: photo.id, category_id: categoryId, person_name: personName }),
+  });
+  showToast('Bewaard');
+  if (queue.length <= 2) await aanvullen();
+  toonVolgende();
+}
+
+document.getElementById('bevestignaam').addEventListener('click', () => {
+  const naam = document.getElementById('naaminput').value.trim();
+  if (!naam) { alert('Vul een naam in.'); return; }
+  submitChoice(pendingCategoryId, naam);
+});
+
+function toonVolgende() {
+  document.getElementById('teller').textContent = queue.length ? `nog ${queue.length}+` : '';
+  if (queue.length === 0) {
+    document.getElementById('stage-wrap').style.display = 'none';
+    document.getElementById('klaarcard').style.display = 'block';
+    return;
+  }
+  document.getElementById('stage-wrap').style.display = 'block';
+  document.getElementById('klaarcard').style.display = 'none';
+  const foto = queue[0];
+  document.getElementById('foto').src = '/' + foto.thumb_medium;
+  // volgende foto alvast preloaden voor een soepele overgang
+  if (queue[1]) { new Image().src = '/' + queue[1].thumb_medium; }
+}
+
+async function aanvullen() {
+  const nieuw = await api('/api/queue?limit=8');
+  const bekend = new Set(queue.map(p => p.id));
+  nieuw.forEach(p => { if (!bekend.has(p.id)) queue.push(p); });
+}
+
+async function laadNamen() {
+  try {
+    const resultaten = await api('/api/resultaten');
+    const namen = new Set();
+    resultaten.forEach(g => g.photos.forEach(p => { if (p.person_name) namen.add(p.person_name); }));
+    document.getElementById('naamlijst').innerHTML =
+      [...namen].map(n => `<option value="${n}">`).join('');
+  } catch (e) {}
+}
+
+document.getElementById('toon-nieuwe-cat').addEventListener('click', () => {
+  document.getElementById('nieuwe-cat-form').style.display = 'block';
+  document.getElementById('nieuwe-cat-naam').focus();
+});
+document.getElementById('nieuwe-cat-opslaan').addEventListener('click', async () => {
+  const naam = document.getElementById('nieuwe-cat-naam').value.trim();
+  if (!naam) return;
+  await api('/api/categories', { method: 'POST', body: JSON.stringify({ name: naam }) });
+  document.getElementById('nieuwe-cat-naam').value = '';
+  document.getElementById('nieuwe-cat-form').style.display = 'none';
+  categories = await api('/api/categories');
+  renderCatgrid();
+  showToast('Categorie toegevoegd');
+});
+
+document.addEventListener('keydown', (e) => {
+  const n = parseInt(e.key, 10);
+  if (n && categories[n - 1]) chooseCategory(categories[n - 1]);
+});
+
+(async function init() {
+  categories = await api('/api/categories');
+  renderCatgrid();
+  queue = await api('/api/queue?limit=8');
+  toonVolgende();
+  laadNamen();
+})();
+</script>
+</body>
+</html>
