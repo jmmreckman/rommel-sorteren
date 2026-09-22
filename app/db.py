@@ -40,6 +40,7 @@ CREATE TABLE IF NOT EXISTS photos (
     thumb_small TEXT NOT NULL,
     thumb_medium TEXT NOT NULL,
     drive_link TEXT,
+    tags TEXT NOT NULL DEFAULT '',
     added_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -78,6 +79,9 @@ def get_db():
 def init_db():
     with get_db() as conn:
         conn.executescript(SCHEMA)
+        cols = {row["name"] for row in conn.execute("PRAGMA table_info(photos)")}
+        if "tags" not in cols:
+            conn.execute("ALTER TABLE photos ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
         existing = conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"]
         if existing == 0:
             seeded = [

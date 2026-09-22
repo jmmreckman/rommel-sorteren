@@ -4,7 +4,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, Request, Response, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -212,29 +212,24 @@ def api_delete_photo(photo_id: int):
 
 
 @app.post("/api/photos/upload")
-async def api_upload_photo(file: UploadFile = File(...)):
+async def api_upload_photo(file: UploadFile = File(...), tags: str = Form("")):
     raw = await file.read()
     if not raw:
         raise HTTPException(400, "leeg bestand")
     loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(None, upload_photo, raw, file.filename, file.content_type)
+        result = await loop.run_in_executor(None, upload_photo, raw, file.filename, file.content_type, tags)
     except Exception as e:
         raise HTTPException(500, f"upload mislukt: {e}")
     return result
 
 
-@app.get("/api/photos/{photo_id}/lookup")
-def api_lookup_photo(photo_id: int):
-    with get_db() as conn:
-        photo = conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone()
-        if not photo:
-            raise HTTPException(404, "foto niet gevonden")
-        cats = {c["id"]: dict(c) for c in conn.execute("SELECT * FROM categories").fetchall()}
-        choices = {
-            row["user"]: row
-            for row in conn.execute("SELECT * FROM choices WHERE photo_id=?", (photo_id,)).fetchall()
-        }
+def _describe_photo(conn, photo) -> dict:
+    cats = {c["id"]: dict(c) for c in conn.execute("SELECT * FROM categories").fetchall()}
+    choices = {
+        row["user"]: row
+        for row in conn.execute("SELECT * FROM choices WHERE photo_id=?", (photo["id"],)).fetchall()
+    }
 
     def describe(user):
         c = choices.get(user)
@@ -262,11 +257,39 @@ def api_lookup_photo(photo_id: int):
     return {
         "id": photo["id"],
         "filename": photo["filename"],
+        "thumb_small": photo["thumb_small"],
         "thumb_medium": photo["thumb_medium"],
+        "tags": photo["tags"],
         "status": status,
         "ayla": ayla,
         "jurian": jurian,
     }
+
+
+@app.get("/api/photos/{photo_id}/lookup")
+def api_lookup_photo(photo_id: int):
+    with get_db() as conn:
+        photo = conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone()
+        if not photo:
+            raise HTTPException(404, "foto niet gevonden")
+        return _describe_photo(conn, photo)
+
+
+@app.get("/api/photos/search")
+def api_search_photos(q: str):
+    q = q.strip()
+    if not q:
+        return []
+    with get_db() as conn:
+        if q.isdigit():
+            photo = conn.execute("SELECT * FROM photos WHERE id=?", (int(q),)).fetchone()
+            rows = [photo] if photo else []
+        else:
+            rows = conn.execute(
+                "SELECT * FROM photos WHERE tags LIKE ? ORDER BY added_at DESC LIMIT 40",
+                (f"%{q}%",),
+            ).fetchall()
+        return [_describe_photo(conn, r) for r in rows]
 
 
 @app.get("/api/queue")

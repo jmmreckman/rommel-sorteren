@@ -111,11 +111,10 @@ def sync_drive() -> dict:
     return {"added": added, "skipped_already_synced": skipped}
 
 
-def upload_photo(raw: bytes, filename: str, content_type: str | None) -> dict:
+def upload_photo(raw: bytes, filename: str, content_type: str | None, tags: str = "") -> dict:
     """Voor foto's die rechtstreeks vanuit de app gemaakt worden: geen Drive
-    nodig, gewoon direct thumbnails maken en lokaal registreren, zodat het
-    toegewezen foto-nummer meteen teruggegeven kan worden (voor het
-    opschrijven op het voorwerp)."""
+    nodig, gewoon direct thumbnails maken en lokaal registreren, zodat de
+    ingevulde tags/naam meteen doorzoekbaar zijn."""
     local_id = f"local:{uuid.uuid4().hex}"
 
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,14 +125,14 @@ def upload_photo(raw: bytes, filename: str, content_type: str | None) -> dict:
 
     with get_db() as conn:
         cur = conn.execute(
-            """INSERT INTO photos (drive_file_id, filename, thumb_small, thumb_medium, drive_link)
-               VALUES (?, ?, ?, ?, ?)""",
+            """INSERT INTO photos (drive_file_id, filename, thumb_small, thumb_medium, drive_link, tags)
+               VALUES (?, ?, ?, ?, ?, ?)""",
             (local_id, filename or "foto.jpg", f"thumbs/{small_path.name}",
-             f"thumbs/{medium_path.name}", None),
+             f"thumbs/{medium_path.name}", None, (tags or "").strip()),
         )
         photo_id = cur.lastrowid
 
-    return {"id": photo_id, "drive_file_id": local_id}
+    return {"id": photo_id, "drive_file_id": local_id, "tags": (tags or "").strip()}
 
 
 if __name__ == "__main__":

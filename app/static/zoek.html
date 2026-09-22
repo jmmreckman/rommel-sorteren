@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<title>Zoek op nummer — Rommel Sorteren</title>
+<title>Zoeken — Rommel Sorteren</title>
 <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
@@ -11,61 +11,78 @@
   <div class="topbar">
     <a href="/">&larr; hoofdpagina</a>
   </div>
-  <h1>🔎 Zoek op nummer</h1>
-  <p class="muted">Typ het nummer dat op het voorwerp staat.</p>
+  <h1>🔎 Zoeken</h1>
+  <p class="muted">Typ een naam/tag (bv. "beker") of een foto-nummer.</p>
 
   <div class="card">
-    <input type="number" inputmode="numeric" id="nummerinput" placeholder="bv. 42"
-      style="width:100%;padding:16px;font-size:1.4rem;border-radius:10px;border:1px solid var(--border);text-align:center;">
+    <input type="text" id="zoekinput" placeholder="bv. beker, of 42"
+      style="width:100%;padding:16px;font-size:1.2rem;border-radius:10px;border:1px solid var(--border);">
     <button class="btn" id="zoekbtn" style="margin-top:10px;">Zoeken</button>
   </div>
 
-  <div id="resultaat"></div>
+  <div id="resultaten"></div>
+  <div class="empty" id="leeg" style="display:none;">Niks gevonden.</div>
 </div>
 <script src="/assets/app.js"></script>
 <script>
+const statusLabel = {
+  definitief: '✅ Definitief besluit',
+  overleg: '🗣️ Staat in het overleg',
+  wachten: '⏳ Nog maar één van jullie koos',
+  'nog niks gekozen': '⚪ Nog geen keuze',
+};
+
+function regel(naam, info) {
+  if (!info) return `<p class="muted">${naam}: nog geen keuze</p>`;
+  const naamErbij = info.person_name ? ` (${info.person_name})` : '';
+  return `<p><span class="dot" style="background:${info.color}"></span> ${naam}: <strong>${info.category}${naamErbij}</strong></p>`;
+}
+
 async function zoek() {
-  const id = document.getElementById('nummerinput').value.trim();
-  const el = document.getElementById('resultaat');
+  const q = document.getElementById('zoekinput').value.trim();
+  const el = document.getElementById('resultaten');
   el.innerHTML = '';
-  if (!id) return;
+  document.getElementById('leeg').style.display = 'none';
+  if (!q) return;
 
   let data;
   try {
-    data = await api(`/api/photos/${id}/lookup`);
+    data = await api(`/api/photos/search?q=${encodeURIComponent(q)}`);
   } catch (e) {
-    el.innerHTML = `<div class="card empty">Foto #${id} niet gevonden.</div>`;
+    document.getElementById('leeg').textContent = 'Zoeken mislukt: ' + e.message;
+    document.getElementById('leeg').style.display = 'block';
     return;
   }
 
-  const statusLabel = {
-    definitief: '✅ Definitief besluit',
-    overleg: '🗣️ Staat in het overleg — nog geen overeenstemming',
-    wachten: '⏳ Nog maar één van jullie heeft gekozen',
-    'nog niks gekozen': '⚪ Nog geen keuze gemaakt',
-  }[data.status] || data.status;
-
-  function regel(naam, info) {
-    if (!info) return `<p class="muted">${naam}: nog geen keuze</p>`;
-    const naamErbij = info.person_name ? ` (${info.person_name})` : '';
-    return `<p><span class="dot" style="background:${info.color}"></span> ${naam}: <strong>${info.category}${naamErbij}</strong></p>`;
+  if (!data.length) {
+    document.getElementById('leeg').textContent = 'Niks gevonden.';
+    document.getElementById('leeg').style.display = 'block';
+    return;
   }
 
-  el.innerHTML = `
-    <div class="card">
-      <img src="/${data.thumb_medium}" alt="" style="width:100%;border-radius:12px;margin-bottom:12px;">
-      <p class="muted">${statusLabel}</p>
-      ${regel('Ayla', data.ayla)}
-      ${regel('Jurian', data.jurian)}
-    </div>
-  `;
+  data.forEach(p => {
+    const kaart = document.createElement('div');
+    kaart.className = 'card';
+    kaart.innerHTML = `
+      <div style="display:flex; gap:12px;">
+        <img src="/${p.thumb_small}" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:10px;flex-shrink:0;">
+        <div style="flex:1;">
+          <p class="muted" style="margin:0 0 4px;">#${p.id}${p.tags ? ' — ' + p.tags : ''}</p>
+          <p class="muted" style="margin:0 0 6px;">${statusLabel[p.status] || p.status}</p>
+          ${regel('Ayla', p.ayla)}
+          ${regel('Jurian', p.jurian)}
+        </div>
+      </div>
+    `;
+    el.appendChild(kaart);
+  });
 }
 
 document.getElementById('zoekbtn').addEventListener('click', zoek);
-document.getElementById('nummerinput').addEventListener('keydown', (e) => {
+document.getElementById('zoekinput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') zoek();
 });
-document.getElementById('nummerinput').focus();
+document.getElementById('zoekinput').focus();
 </script>
 </body>
 </html>

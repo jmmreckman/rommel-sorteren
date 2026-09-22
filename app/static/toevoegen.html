@@ -13,39 +13,70 @@
     <span class="muted" id="teller">0 foto's deze sessie</span>
   </div>
   <h1>📸 Foto toevoegen</h1>
-  <p class="muted">Maak een foto van het voorwerp. Zodra hij geupload is, krijg je meteen een nummer — schrijf dat op tape en plak het op het voorwerp.</p>
+  <p class="muted">Maak een foto, geef 'm een naam/tags (bv. "beker, keuken") en upload. Zoek daarmee later terug via "Zoeken" — dan hoef je niks op het voorwerp te plakken.</p>
 
-  <div class="card" id="nummerkaart" style="display:none; text-align:center;">
-    <p class="muted" style="margin-bottom:4px;">Foto-nummer</p>
-    <div id="nummer" style="font-size:3.5rem; font-weight:800; color:var(--accent);">—</div>
+  <div id="startkaart">
+    <label class="btn" for="fotoinput" style="display:block; text-align:center;">📷 Foto maken</label>
+    <input type="file" id="fotoinput" accept="image/*" capture="environment" style="display:none;">
+  </div>
+
+  <div class="card" id="invoerkaart" style="display:none;">
+    <img id="preview" src="" alt="" style="width:100%;border-radius:12px;margin-bottom:12px;">
+    <input type="text" id="tagsinput" placeholder="naam/tags, met komma's gescheiden (optioneel)"
+      style="width:100%;padding:14px;font-size:1rem;border-radius:10px;border:1px solid var(--border);margin-bottom:10px;">
+    <button class="btn" id="uploadbtn">Uploaden</button>
+    <button class="btn secondary" id="annuleerbtn">Opnieuw maken</button>
   </div>
 
   <div class="card" id="wachtkaart" style="display:none; text-align:center;">
     <p class="muted">Bezig met uploaden...</p>
   </div>
 
-  <div class="card" id="foutkaart" style="display:none; text-align:center; color:var(--cat4);"></div>
+  <div class="card" id="okkaart" style="display:none; text-align:center;">
+    <p style="font-size:1.4rem;">✅ Opgeslagen</p>
+    <p class="muted" id="oktags"></p>
+  </div>
 
-  <label class="btn" for="fotoinput" style="display:block; text-align:center;">📷 Volgende foto maken</label>
-  <input type="file" id="fotoinput" accept="image/*" capture="environment" style="display:none;">
+  <div class="card" id="foutkaart" style="display:none; text-align:center; color:var(--cat4);"></div>
 </div>
 <div class="toast" id="toast"></div>
 <script src="/assets/app.js"></script>
 <script>
 let count = 0;
+let gekozenBestand = null;
 const input = document.getElementById('fotoinput');
 
-input.addEventListener('change', async () => {
+function toonKaart(id) {
+  ['startkaart', 'invoerkaart', 'wachtkaart', 'okkaart', 'foutkaart'].forEach(k => {
+    document.getElementById(k).style.display = (k === id) ? 'block' : 'none';
+  });
+}
+
+input.addEventListener('change', () => {
   const file = input.files[0];
   if (!file) return;
+  gekozenBestand = file;
+  document.getElementById('preview').src = URL.createObjectURL(file);
+  document.getElementById('tagsinput').value = '';
+  toonKaart('invoerkaart');
+  document.getElementById('tagsinput').focus();
+});
 
-  document.getElementById('nummerkaart').style.display = 'none';
-  document.getElementById('foutkaart').style.display = 'none';
-  document.getElementById('wachtkaart').style.display = 'block';
+document.getElementById('annuleerbtn').addEventListener('click', () => {
+  gekozenBestand = null;
+  input.value = '';
+  toonKaart('startkaart');
+});
+
+document.getElementById('uploadbtn').addEventListener('click', async () => {
+  if (!gekozenBestand) return;
+  const tags = document.getElementById('tagsinput').value.trim();
+  toonKaart('wachtkaart');
 
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', gekozenBestand);
+    formData.append('tags', tags);
     const res = await fetch('/api/photos/upload', { method: 'POST', body: formData });
     if (res.status === 401) { location.href = '/login'; return; }
     if (!res.ok) {
@@ -55,14 +86,16 @@ input.addEventListener('change', async () => {
     const data = await res.json();
     count++;
     document.getElementById('teller').textContent = `${count} foto's deze sessie`;
-    document.getElementById('nummer').textContent = '#' + data.id;
-    document.getElementById('nummerkaart').style.display = 'block';
+    document.getElementById('oktags').textContent = tags ? `Tags: ${tags}` : '(geen tags ingevuld)';
+    toonKaart('okkaart');
+    setTimeout(() => {
+      gekozenBestand = null;
+      input.value = '';
+      toonKaart('startkaart');
+    }, 1400);
   } catch (e) {
     document.getElementById('foutkaart').textContent = 'Uploaden mislukt: ' + e.message;
-    document.getElementById('foutkaart').style.display = 'block';
-  } finally {
-    document.getElementById('wachtkaart').style.display = 'none';
-    input.value = '';
+    toonKaart('foutkaart');
   }
 });
 </script>
