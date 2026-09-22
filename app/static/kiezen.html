@@ -26,6 +26,7 @@
       <datalist id="naamlijst"></datalist>
       <button class="btn" id="bevestignaam">Bevestigen</button>
     </div>
+    <button class="btn secondary" id="overslaan" style="margin-top:4px;">⏭️ Overslaan, later beslissen</button>
     <a href="#" id="verwijderfoto" class="delete-link">🗑 deze foto verwijderen (dubbel/niet relevant)</a>
   </div>
 
@@ -180,6 +181,15 @@ document.getElementById('nieuwe-cat-opslaan').addEventListener('click', async ()
 document.addEventListener('keydown', (e) => {
   const n = parseInt(e.key, 10);
   if (n && categories[n - 1]) chooseCategory(categories[n - 1]);
+});
+
+document.getElementById('overslaan').addEventListener('click', async () => {
+  if (!queue.length) return;
+  const foto = queue.shift();
+  queue.push(foto); // naar achteren, komt later vanzelf weer langs
+  document.getElementById('namebox').classList.remove('show');
+  if (queue.length <= 2) await aanvullen();
+  toonVolgende();
 });
 
 document.getElementById('verwijderfoto').addEventListener('click', async (e) => {
