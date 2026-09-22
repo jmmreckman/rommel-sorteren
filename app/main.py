@@ -21,7 +21,7 @@ DATA_DIR = APP_DIR.parent / "data"
 
 app = FastAPI(title="Rommel Sorteren")
 
-PUBLIC_PATHS = {"/login", "/health"}
+PUBLIC_PATHS = {"/login", "/health", "/garage-sale"}
 
 
 def _site_password() -> str:
@@ -44,7 +44,8 @@ def _parse_session(cookie_value: str | None) -> str | None:
 @app.middleware("http")
 async def require_login(request: Request, call_next):
     path = request.url.path
-    if path in PUBLIC_PATHS or path.startswith("/assets/") or path.startswith("/thumbs/"):
+    if (path in PUBLIC_PATHS or path.startswith("/assets/") or path.startswith("/thumbs/")
+            or path.startswith("/api/garage-sale")):
         return await call_next(request)
     user = _parse_session(request.cookies.get("session"))
     if user is None:
@@ -131,6 +132,20 @@ def api_add_category(body: CategoryIn):
         )
         row = conn.execute("SELECT * FROM categories WHERE id=?", (cur.lastrowid,)).fetchone()
     return dict(row)
+
+
+class CategoryUpdateIn(BaseModel):
+    garage_sale: bool
+
+
+@app.patch("/api/categories/{category_id}")
+def api_update_category(category_id: int, body: CategoryUpdateIn):
+    with get_db() as conn:
+        row = conn.execute("SELECT id FROM categories WHERE id=?", (category_id,)).fetchone()
+        if not row:
+            raise HTTPException(404, "categorie niet gevonden")
+        conn.execute("UPDATE categories SET garage_sale=? WHERE id=?", (int(body.garage_sale), category_id))
+    return {"ok": True}
 
 
 @app.get("/api/stats")
@@ -419,6 +434,62 @@ def api_resultaten():
     return list(grouped.values())
 
 
+@app.get("/api/garage-sale")
+def api_garage_sale():
+    with get_db() as conn:
+        garage_cats = {row["id"] for row in conn.execute("SELECT id FROM categories WHERE garage_sale=1")}
+        if not garage_cats:
+            return []
+        rows = conn.execute(
+            """SELECT p.*, ca.category_id cat_a, ca.person_name name_a, cj.category_id cat_j, cj.person_name name_j
+               FROM photos p
+               JOIN choices ca ON ca.photo_id = p.id AND ca.user = 'ayla'
+               JOIN choices cj ON cj.photo_id = p.id AND cj.user = 'jurian'
+               ORDER BY p.added_at ASC"""
+        ).fetchall()
+        result = []
+        for r in rows:
+            a = {"category_id": r["cat_a"], "person_name": r["name_a"]}
+            b = {"category_id": r["cat_j"], "person_name": r["name_j"]}
+            if not choices_match(a, b) or r["cat_a"] not in garage_cats:
+                continue
+            interesse = [
+                row["name"] for row in conn.execute(
+                    "SELECT name FROM garage_sale_interest WHERE photo_id=? ORDER BY created_at",
+                    (r["id"],),
+                ).fetchall()
+            ]
+            result.append({
+                "id": r["id"],
+                "filename": r["filename"],
+                "thumb_small": r["thumb_small"],
+                "thumb_medium": r["thumb_medium"],
+                "tags": r["tags"],
+                "interesse": interesse,
+            })
+    return result
+
+
+class InterestIn(BaseModel):
+    name: str
+
+
+@app.post("/api/garage-sale/{photo_id}/interest")
+def api_garage_sale_interest(photo_id: int, body: InterestIn):
+    naam = body.name.strip()
+    if not naam:
+        raise HTTPException(400, "naam mag niet leeg zijn")
+    with get_db() as conn:
+        photo = conn.execute("SELECT id FROM photos WHERE id=?", (photo_id,)).fetchone()
+        if not photo:
+            raise HTTPException(404, "product niet gevonden")
+        conn.execute(
+            "INSERT INTO garage_sale_interest (photo_id, name) VALUES (?, ?)",
+            (photo_id, naam),
+        )
+    return {"ok": True}
+
+
 (DATA_DIR / "thumbs").mkdir(parents=True, exist_ok=True)
 app.mount("/thumbs", StaticFiles(directory=str(DATA_DIR / "thumbs")), name="thumbs")
 app.mount("/assets", StaticFiles(directory=str(APP_DIR / "static")), name="assets")
@@ -433,6 +504,7 @@ def spa(page: str):
         "resultaten": "resultaten.html",
         "toevoegen": "toevoegen.html",
         "zoek": "zoek.html",
+        "garage-sale": "garage-sale.html",
     }
     filename = file_map.get(page.strip("/"))
     if not filename:

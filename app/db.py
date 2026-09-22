@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS categories (
     requires_name INTEGER NOT NULL DEFAULT 0,
     sort_order INTEGER NOT NULL DEFAULT 0,
     color TEXT NOT NULL DEFAULT '#888888',
+    garage_sale INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -53,6 +54,15 @@ CREATE TABLE IF NOT EXISTS choices (
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(photo_id, user)
 );
+
+-- Wie interesse heeft getoond in een garage-sale-product (publieke pagina,
+-- geen account nodig - dus gewoon een vrij ingevulde naam).
+CREATE TABLE IF NOT EXISTS garage_sale_interest (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    photo_id INTEGER NOT NULL REFERENCES photos(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
@@ -75,6 +85,9 @@ def init_db():
         cols = {row["name"] for row in conn.execute("PRAGMA table_info(photos)")}
         if "tags" not in cols:
             conn.execute("ALTER TABLE photos ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        cat_cols = {row["name"] for row in conn.execute("PRAGMA table_info(categories)")}
+        if "garage_sale" not in cat_cols:
+            conn.execute("ALTER TABLE categories ADD COLUMN garage_sale INTEGER NOT NULL DEFAULT 0")
         conn.execute("DROP TABLE IF EXISTS deleted_drive_files")
         existing = conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"]
         if existing == 0:

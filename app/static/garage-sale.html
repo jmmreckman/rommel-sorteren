@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Garage Sale — Rommel Sorteren</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <h1>🏷️ Garage Sale</h1>
+  <p class="muted">Zie je iets dat je wel wilt hebben? Klik erop en zet je naam eronder!</p>
+  <div class="grid" id="grid"></div>
+  <div class="empty" id="leeg" style="display:none;">Nog niks te koop gezet.</div>
+</div>
+<div class="toast" id="toast"></div>
+<script src="/assets/app.js"></script>
+<script>
+async function toonInteresse(photoId) {
+  const naam = prompt('Wat is je naam?');
+  if (!naam || !naam.trim()) return;
+  try {
+    await api(`/api/garage-sale/${photoId}/interest`, {
+      method: 'POST',
+      body: JSON.stringify({ name: naam.trim() }),
+    });
+    showToast('Bedankt! Je naam staat erbij.');
+    laad();
+  } catch (e) {
+    alert('Kon dit niet opslaan: ' + e.message);
+  }
+}
+
+async function laad() {
+  const items = await api('/api/garage-sale');
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  document.getElementById('leeg').style.display = items.length ? 'none' : 'block';
+  items.forEach(p => {
+    const fig = document.createElement('figure');
+    fig.style.cursor = 'pointer';
+    const img = document.createElement('img');
+    img.src = '/' + p.thumb_small;
+    img.alt = '';
+    fig.appendChild(img);
+    const cap = document.createElement('figcaption');
+    cap.textContent = p.tags || p.filename;
+    fig.appendChild(cap);
+    if (p.interesse.length) {
+      const lijst = document.createElement('div');
+      lijst.className = 'muted';
+      lijst.style.fontSize = '0.72rem';
+      lijst.style.marginTop = '2px';
+      lijst.textContent = '❤️ ' + p.interesse.join(', ');
+      fig.appendChild(lijst);
+    }
+    fig.addEventListener('click', () => toonInteresse(p.id));
+    grid.appendChild(fig);
+  });
+}
+laad();
+</script>
+</body>
+</html>

@@ -38,7 +38,10 @@
   </div>
 
   <div class="card" style="margin-top:18px;">
-    <button class="btn secondary" id="toon-nieuwe-cat">+ Nieuwe categorie toevoegen</button>
+    <h2>Categorieën</h2>
+    <p class="muted" style="margin-top:-4px;">Vink "garage-sale" aan om spullen uit die categorie te tonen op de publieke <a href="/garage-sale" target="_blank">garage-sale-pagina</a>.</p>
+    <div id="categorielijst"></div>
+    <button class="btn secondary" id="toon-nieuwe-cat" style="margin-top:10px;">+ Nieuwe categorie toevoegen</button>
     <div id="nieuwe-cat-form" style="display:none; margin-top:10px;">
       <input type="text" id="nieuwe-cat-naam" placeholder="Naam van de nieuwe categorie"
         style="width:100%;padding:12px;font-size:1rem;border-radius:10px;border:1px solid var(--border);margin-bottom:8px;">
@@ -64,6 +67,42 @@ function renderCatgrid() {
     b.textContent = c.name;
     b.addEventListener('click', () => chooseCategory(c));
     grid.appendChild(b);
+  });
+}
+
+function renderCategorielijst() {
+  const el = document.getElementById('categorielijst');
+  el.innerHTML = '';
+  categories.forEach((c) => {
+    const rij = document.createElement('label');
+    rij.style.display = 'flex';
+    rij.style.alignItems = 'center';
+    rij.style.gap = '10px';
+    rij.style.padding = '8px 0';
+    rij.style.borderBottom = '1px solid var(--border)';
+    rij.innerHTML = `
+      <span class="dot" style="background:${c.color}; width:14px; height:14px;"></span>
+      <span style="flex:1;">${c.name}</span>
+      <span class="muted" style="font-size:0.78rem;">garage-sale</span>
+    `;
+    const check = document.createElement('input');
+    check.type = 'checkbox';
+    check.checked = !!c.garage_sale;
+    check.addEventListener('change', async () => {
+      try {
+        await api(`/api/categories/${c.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ garage_sale: check.checked }),
+        });
+        c.garage_sale = check.checked;
+        showToast(check.checked ? `"${c.name}" staat nu op de garage-sale` : `"${c.name}" van de garage-sale gehaald`);
+      } catch (e) {
+        check.checked = !check.checked;
+        showToast('Opslaan mislukt');
+      }
+    });
+    rij.appendChild(check);
+    el.appendChild(rij);
   });
 }
 
@@ -176,6 +215,7 @@ document.getElementById('nieuwe-cat-opslaan').addEventListener('click', async ()
   document.getElementById('nieuwe-cat-form').style.display = 'none';
   categories = await api('/api/categories');
   renderCatgrid();
+  renderCategorielijst();
   showToast('Categorie toegevoegd');
 });
 
@@ -209,6 +249,7 @@ document.getElementById('verwijderfoto').addEventListener('click', async (e) => 
   partnerDisplay = me.partner === 'ayla' ? 'Ayla' : 'Jurian';
   categories = await api('/api/categories');
   renderCatgrid();
+  renderCategorielijst();
   queue = await api('/api/queue?limit=8');
   toonVolgende();
   laadNamen();
