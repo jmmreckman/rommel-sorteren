@@ -12,10 +12,10 @@
     <a href="/">&larr; hoofdpagina</a>
   </div>
   <h1>🔎 Zoeken</h1>
-  <p class="muted">Typ een naam/tag (bv. "beker") of een foto-nummer.</p>
+  <p class="muted">Typ een naam of tag (bv. "beker").</p>
 
   <div class="card">
-    <input type="text" id="zoekinput" placeholder="bv. beker, of 42"
+    <input type="text" id="zoekinput" placeholder="bv. beker"
       style="width:100%;padding:16px;font-size:1.2rem;border-radius:10px;border:1px solid var(--border);">
     <button class="btn" id="zoekbtn" style="margin-top:10px;">Zoeken</button>
   </div>
@@ -67,7 +67,7 @@ async function zoek() {
       <div style="display:flex; gap:12px;">
         <img src="/${p.thumb_small}" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:10px;flex-shrink:0;">
         <div style="flex:1;">
-          <p class="muted" style="margin:0 0 4px;">#${p.id}${p.tags ? ' — ' + p.tags : ''}</p>
+          <p class="muted" style="margin:0 0 4px;">${p.tags || '(geen tags)'}</p>
           <p class="muted" style="margin:0 0 6px;">${statusLabel[p.status] || p.status}</p>
           ${regel('Ayla', p.ayla)}
           ${regel('Jurian', p.jurian)}

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .db import init_db, get_db, USERS, other_user, choices_match, CATEGORY_PALETTE
-from .drive_sync import sync_drive, upload_photo
+from .photos import upload_photo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rommel")
@@ -19,30 +19,6 @@ APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR.parent / "data"
 
 app = FastAPI(title="Rommel Sorteren")
-_sync_lock = asyncio.Lock()
-
-
-async def run_sync():
-    """Draait de (blokkerende) Drive-sync in een aparte thread, met een lock
-    zodat een handmatige klik en de automatische achtergrondsync elkaar
-    nooit overlappen."""
-    async with _sync_lock:
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, sync_drive)
-
-
-async def _periodic_sync_loop():
-    interval_minutes = int(os.environ.get("SYNC_INTERVAL_MINUTES", "2"))
-    while True:
-        try:
-            result = await run_sync()
-            logger.info("Automatische Drive-sync: %s", result)
-        except Exception:
-            logger.exception(
-                "Automatische Drive-sync mislukt, probeer over %s minuten opnieuw",
-                interval_minutes,
-            )
-        await asyncio.sleep(interval_minutes * 60)
 
 PUBLIC_PATHS = {"/login", "/health"}
 
@@ -85,7 +61,6 @@ def current_user(request: Request) -> str:
 @app.on_event("startup")
 def _startup():
     init_db()
-    asyncio.create_task(_periodic_sync_loop())
 
 
 @app.get("/health")
@@ -202,10 +177,6 @@ def api_delete_photo(photo_id: int):
         if not row:
             raise HTTPException(404, "foto niet gevonden")
         conn.execute("DELETE FROM photos WHERE id=?", (photo_id,))
-        conn.execute(
-            "INSERT OR IGNORE INTO deleted_drive_files (drive_file_id) VALUES (?)",
-            (row["drive_file_id"],),
-        )
     for rel_path in (row["thumb_small"], row["thumb_medium"]):
         (DATA_DIR / rel_path).unlink(missing_ok=True)
     return {"ok": True}
@@ -232,7 +203,7 @@ async def api_upload_photo(file: UploadFile = File(...), tags: str = Form("")):
         raise HTTPException(400, "leeg bestand")
     loop = asyncio.get_event_loop()
     try:
-        result = await loop.run_in_executor(None, upload_photo, raw, file.filename, file.content_type, tags)
+        result = await loop.run_in_executor(None, upload_photo, raw, file.filename, tags)
     except Exception as e:
         raise HTTPException(500, f"upload mislukt: {e}")
     return result
@@ -280,29 +251,16 @@ def _describe_photo(conn, photo) -> dict:
     }
 
 
-@app.get("/api/photos/{photo_id}/lookup")
-def api_lookup_photo(photo_id: int):
-    with get_db() as conn:
-        photo = conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone()
-        if not photo:
-            raise HTTPException(404, "foto niet gevonden")
-        return _describe_photo(conn, photo)
-
-
 @app.get("/api/photos/search")
 def api_search_photos(q: str):
     q = q.strip()
     if not q:
         return []
     with get_db() as conn:
-        if q.isdigit():
-            photo = conn.execute("SELECT * FROM photos WHERE id=?", (int(q),)).fetchone()
-            rows = [photo] if photo else []
-        else:
-            rows = conn.execute(
-                "SELECT * FROM photos WHERE tags LIKE ? ORDER BY added_at DESC LIMIT 40",
-                (f"%{q}%",),
-            ).fetchall()
+        rows = conn.execute(
+            "SELECT * FROM photos WHERE tags LIKE ? ORDER BY added_at DESC LIMIT 40",
+            (f"%{q}%",),
+        ).fetchall()
         return [_describe_photo(conn, r) for r in rows]
 
 
@@ -434,14 +392,6 @@ def api_resultaten():
             "tags": r["tags"],
         })
     return list(grouped.values())
-
-
-@app.post("/api/sync")
-async def api_sync():
-    try:
-        return await run_sync()
-    except Exception as e:
-        raise HTTPException(500, f"sync mislukt: {e}")
 
 
 (DATA_DIR / "thumbs").mkdir(parents=True, exist_ok=True)
