@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .db import init_db, get_db, USERS, other_user, choices_match, CATEGORY_PALETTE
+from .mailer import stuur_mail
 from .photos import upload_photo
 
 logging.basicConfig(level=logging.INFO)
@@ -291,6 +292,17 @@ class ChoiceIn(BaseModel):
     person_name: str | None = None
 
 
+def _meld_mijlpaal(user: str, total_choices: int) -> None:
+    """Mailt Jurian zodra Ayla weer 10 foto's verwerkt heeft."""
+    if user != "ayla" or total_choices == 0 or total_choices % 10 != 0:
+        return
+    stuur_mail(
+        "Ayla is weer bezig geweest op Rommel Sorteren! 🎉",
+        f"Ayla heeft nu in totaal {total_choices} foto's gecategoriseerd.\n\n"
+        f"Kijk maar mee op https://rommel.steenhub.nl",
+    )
+
+
 @app.post("/api/choice")
 def api_choice(body: ChoiceIn, user: str = Depends(current_user)):
     partner = other_user(user)
@@ -312,6 +324,7 @@ def api_choice(body: ChoiceIn, user: str = Depends(current_user)):
         total_choices = conn.execute(
             "SELECT COUNT(*) c FROM choices WHERE user=?", (user,)
         ).fetchone()["c"]
+    _meld_mijlpaal(user, total_choices)
     if partner_choice is None:
         return {"ok": True, "partner_chose": False, "match": None, "total_choices": total_choices}
     match = choices_match(
@@ -372,6 +385,7 @@ def api_overleg_adopt(photo_id: int, user: str = Depends(current_user)):
         total_choices = conn.execute(
             "SELECT COUNT(*) c FROM choices WHERE user=?", (user,)
         ).fetchone()["c"]
+    _meld_mijlpaal(user, total_choices)
     return {"ok": True, "total_choices": total_choices}
 
 
