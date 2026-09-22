@@ -6,6 +6,15 @@ DB_PATH = Path(__file__).resolve().parent.parent / "data" / "rommel.db"
 
 USERS = ("ayla", "jurian")
 
+# Vaste volgorde van kleuren die automatisch aan nieuwe categorieen wordt
+# toegekend, zodat je er als gebruiker aan went welke kleur bij welke
+# categorie hoort.
+CATEGORY_PALETTE = [
+    "#4d7ea8", "#4d8a6a", "#c98a3c", "#a8524d",
+    "#6a5acd", "#178a8a", "#8a6d4d", "#4d4d8a",
+    "#a84d8a", "#4da89e",
+]
+
 DEFAULT_CATEGORIES = [
     # (naam, vraagt om een naam erbij, volgorde)
     ("Kringloop / rommelmarkt", 0, 1),
@@ -20,6 +29,7 @@ CREATE TABLE IF NOT EXISTS categories (
     name TEXT NOT NULL UNIQUE,
     requires_name INTEGER NOT NULL DEFAULT 0,
     sort_order INTEGER NOT NULL DEFAULT 0,
+    color TEXT NOT NULL DEFAULT '#888888',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -63,9 +73,13 @@ def init_db():
         conn.executescript(SCHEMA)
         existing = conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"]
         if existing == 0:
+            seeded = [
+                (name, requires_name, order, CATEGORY_PALETTE[i % len(CATEGORY_PALETTE)])
+                for i, (name, requires_name, order) in enumerate(DEFAULT_CATEGORIES)
+            ]
             conn.executemany(
-                "INSERT INTO categories (name, requires_name, sort_order) VALUES (?, ?, ?)",
-                DEFAULT_CATEGORIES,
+                "INSERT INTO categories (name, requires_name, sort_order, color) VALUES (?, ?, ?, ?)",
+                seeded,
             )
 
 

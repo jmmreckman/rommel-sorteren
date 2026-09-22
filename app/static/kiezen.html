@@ -14,7 +14,11 @@
   </div>
 
   <div id="stage-wrap">
-    <div class="photo-stage"><img id="foto" alt=""></div>
+    <div class="partnertag" id="partnertag"></div>
+    <div class="photo-stage">
+      <img id="foto" alt="">
+      <div class="matchbanner" id="matchbanner"></div>
+    </div>
     <div class="catgrid" id="catgrid"></div>
     <div class="namebox" id="namebox">
       <input type="text" id="naaminput" placeholder="Naam van wie het krijgt" list="naamlijst">
@@ -45,14 +49,15 @@
 let categories = [];
 let queue = [];
 let pendingCategoryId = null;
+let partnerDisplay = '';
 
 function renderCatgrid() {
   const grid = document.getElementById('catgrid');
   grid.innerHTML = '';
-  categories.forEach((c, i) => {
+  categories.forEach((c) => {
     const b = document.createElement('button');
     b.className = 'catbtn';
-    b.style.background = colorForIndex(i);
+    b.style.background = c.color;
     b.textContent = c.name;
     b.addEventListener('click', () => chooseCategory(c));
     grid.appendChild(b);
@@ -73,13 +78,32 @@ function chooseCategory(cat) {
 async function submitChoice(categoryId, personName) {
   const photo = queue.shift();
   document.getElementById('namebox').classList.remove('show');
-  await api('/api/choice', {
+  const result = await api('/api/choice', {
     method: 'POST',
     body: JSON.stringify({ photo_id: photo.id, category_id: categoryId, person_name: personName }),
   });
-  showToast('Bewaard');
   if (queue.length <= 2) await aanvullen();
-  toonVolgende();
+
+  if (!result.partner_chose) {
+    showToast('Bewaard, wachten op ' + partnerDisplay);
+    toonVolgende();
+    return;
+  }
+  toonMatchBanner(result.match);
+  setTimeout(toonVolgende, 1500);
+}
+
+function toonMatchBanner(match) {
+  const el = document.getElementById('matchbanner');
+  if (match) {
+    el.textContent = '❤️ Jullie matchen!';
+    el.className = 'matchbanner match';
+  } else {
+    el.textContent = '🤔 Komt later wel, nu op de lijst met overleg...';
+    el.className = 'matchbanner mismatch';
+  }
+  el.style.display = 'flex';
+  setTimeout(() => { el.style.display = 'none'; }, 1450);
 }
 
 document.getElementById('bevestignaam').addEventListener('click', () => {
@@ -99,8 +123,22 @@ function toonVolgende() {
   document.getElementById('klaarcard').style.display = 'none';
   const foto = queue[0];
   document.getElementById('foto').src = '/' + foto.thumb_medium;
+  renderPartnerTag(foto);
   // volgende foto alvast preloaden voor een soepele overgang
   if (queue[1]) { new Image().src = '/' + queue[1].thumb_medium; }
+}
+
+function renderPartnerTag(foto) {
+  const el = document.getElementById('partnertag');
+  if (foto.partner_category_id) {
+    const cat = categories.find(c => c.id === foto.partner_category_id);
+    const naam = foto.partner_person_name ? ` (${foto.partner_person_name})` : '';
+    el.textContent = `💬 ${partnerDisplay} koos: ${cat ? cat.name : '?'}${naam}`;
+    el.className = 'partnertag chosen';
+  } else {
+    el.textContent = `🕓 ${partnerDisplay} heeft nog niet gekozen`;
+    el.className = 'partnertag waiting';
+  }
 }
 
 async function aanvullen() {
@@ -140,6 +178,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 (async function init() {
+  const me = await api('/api/me');
+  partnerDisplay = me.partner === 'ayla' ? 'Ayla' : 'Jurian';
   categories = await api('/api/categories');
   renderCatgrid();
   queue = await api('/api/queue?limit=8');

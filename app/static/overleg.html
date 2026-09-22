@@ -33,8 +33,10 @@ function catRow(items) {
   const partnerNaam = items.theirs.person_name ? ` (${items.theirs.person_name})` : '';
   info.innerHTML = `
     <div class="overleg-choices">
-      Jij koos: <span class="mine">${items.mine.category}${mijnNaam}</span><br>
-      Je partner koos: <span class="theirs">${items.theirs.category}${partnerNaam}</span>
+      Jij koos: <span class="dot" style="background:${items.mine.color}"></span>
+        <span class="mine">${items.mine.category}${mijnNaam}</span><br>
+      Je partner koos: <span class="dot" style="background:${items.theirs.color}"></span>
+        <span class="theirs">${items.theirs.category}${partnerNaam}</span>
     </div>
     <div class="overleg-actions" id="acties-${items.id}"></div>
   `;

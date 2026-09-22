@@ -93,7 +93,19 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
 }
 .userpicker button.active { border-color: var(--accent); background: #eaf3ee; }
 
+.partnertag {
+  text-align: center;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.partnertag.waiting { background: var(--border); color: var(--muted); }
+.partnertag.chosen { background: #eaf3ee; color: var(--accent); }
+
 .photo-stage {
+  position: relative;
   border-radius: var(--radius);
   overflow: hidden;
   background: #000;
@@ -104,6 +116,22 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
   margin-bottom: 16px;
 }
 .photo-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.matchbanner {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: white;
+  background: rgba(0, 0, 0, 0.6);
+}
+.matchbanner.match { background: rgba(45, 122, 86, 0.9); }
+.matchbanner.mismatch { background: rgba(201, 138, 60, 0.92); }
 
 .catgrid {
   display: grid;
@@ -120,10 +148,6 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
   cursor: pointer;
   min-height: 66px;
 }
-.catbtn[data-cat="1"] { background: var(--cat1); }
-.catbtn[data-cat="2"] { background: var(--cat2); }
-.catbtn[data-cat="3"] { background: var(--cat3); }
-.catbtn[data-cat="4"] { background: var(--cat4); }
 
 .namebox {
   display: none;
@@ -142,8 +166,16 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
 .overleg-item { display: flex; gap: 12px; align-items: flex-start; }
 .overleg-item img { width: 90px; height: 90px; object-fit: cover; border-radius: 10px; flex-shrink: 0; }
 .overleg-choices { font-size: 0.92rem; margin-bottom: 10px; }
-.overleg-choices .mine { color: var(--accent); font-weight: 600; }
-.overleg-choices .theirs { color: var(--cat4); font-weight: 600; }
+.overleg-choices .mine { font-weight: 600; }
+.overleg-choices .theirs { font-weight: 600; }
+.dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 3px;
+  vertical-align: middle;
+}
 .overleg-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .overleg-actions button {
   padding: 8px 12px;
@@ -160,13 +192,12 @@ p.muted, .muted { color: var(--muted); font-size: 0.9rem; }
   min-width: 130px;
   padding: 10px;
   border-radius: 10px;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   background: white;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
 }
-.tabs button.active { background: var(--accent); color: white; border-color: var(--accent); }
 
 .grid {
   display: grid;

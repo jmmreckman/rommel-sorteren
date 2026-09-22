@@ -22,6 +22,3 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 1600);
 }
-
-const CATEGORY_COLORS = ['#4d7ea8', '#4d8a6a', '#c98a3c', '#a8524d', '#6a5acd', '#178a8a', '#8a6d4d', '#4d4d8a'];
-function colorForIndex(i) { return CATEGORY_COLORS[i % CATEGORY_COLORS.length]; }

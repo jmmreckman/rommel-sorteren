@@ -23,7 +23,13 @@ let actief = 0;
 
 function toonGroep(i) {
   actief = i;
-  document.querySelectorAll('#tabs button').forEach((b, idx) => b.classList.toggle('active', idx === i));
+  document.querySelectorAll('#tabs button').forEach((b, idx) => {
+    const actief = idx === i;
+    b.classList.toggle('active', actief);
+    b.style.background = actief ? groepen[idx].category.color : 'white';
+    b.style.borderColor = groepen[idx].category.color;
+    b.style.color = actief ? 'white' : 'var(--text)';
+  });
   const grid = document.getElementById('grid');
   grid.innerHTML = '';
   const photos = groepen[i].photos;
@@ -51,6 +57,7 @@ function toonGroep(i) {
   groepen.forEach((g, i) => {
     const b = document.createElement('button');
     b.textContent = `${g.category.name} (${g.photos.length})`;
+    b.style.borderColor = g.category.color;
     b.addEventListener('click', () => toonGroep(i));
     tabs.appendChild(b);
   });

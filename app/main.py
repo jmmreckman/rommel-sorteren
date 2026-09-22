@@ -9,7 +9,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .db import init_db, get_db, USERS, other_user, choices_match
+from .db import init_db, get_db, USERS, other_user, choices_match, CATEGORY_PALETTE
 from .drive_sync import sync_drive
 
 logging.basicConfig(level=logging.INFO)
@@ -147,9 +147,11 @@ def api_add_category(body: CategoryIn):
         if existing:
             return dict(existing)
         next_order = conn.execute("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").fetchone()["n"]
+        count = conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"]
+        color = CATEGORY_PALETTE[count % len(CATEGORY_PALETTE)]
         cur = conn.execute(
-            "INSERT INTO categories (name, requires_name, sort_order) VALUES (?, ?, ?)",
-            (name, int(body.requires_name), next_order),
+            "INSERT INTO categories (name, requires_name, sort_order, color) VALUES (?, ?, ?, ?)",
+            (name, int(body.requires_name), next_order, color),
         )
         row = conn.execute("SELECT * FROM categories WHERE id=?", (cur.lastrowid,)).fetchone()
     return dict(row)
@@ -195,12 +197,15 @@ def api_stats(user: str = Depends(current_user)):
 
 @app.get("/api/queue")
 def api_queue(limit: int = 6, user: str = Depends(current_user)):
+    partner = other_user(user)
     with get_db() as conn:
         rows = conn.execute(
-            """SELECT * FROM photos
-               WHERE id NOT IN (SELECT photo_id FROM choices WHERE user=?)
-               ORDER BY added_at ASC LIMIT ?""",
-            (user, limit),
+            """SELECT p.*, cp.category_id AS partner_category_id, cp.person_name AS partner_person_name
+               FROM photos p
+               LEFT JOIN choices cp ON cp.photo_id = p.id AND cp.user = ?
+               WHERE p.id NOT IN (SELECT photo_id FROM choices WHERE user=?)
+               ORDER BY p.added_at ASC LIMIT ?""",
+            (partner, user, limit),
         ).fetchall()
     return [dict(r) for r in rows]
 
@@ -213,6 +218,7 @@ class ChoiceIn(BaseModel):
 
 @app.post("/api/choice")
 def api_choice(body: ChoiceIn, user: str = Depends(current_user)):
+    partner = other_user(user)
     with get_db() as conn:
         cat = conn.execute("SELECT * FROM categories WHERE id=?", (body.category_id,)).fetchone()
         if not cat:
@@ -224,7 +230,17 @@ def api_choice(body: ChoiceIn, user: str = Depends(current_user)):
                  category_id=excluded.category_id, person_name=excluded.person_name, updated_at=datetime('now')""",
             (body.photo_id, user, body.category_id, body.person_name),
         )
-    return {"ok": True}
+        partner_choice = conn.execute(
+            "SELECT category_id, person_name FROM choices WHERE photo_id=? AND user=?",
+            (body.photo_id, partner),
+        ).fetchone()
+    if partner_choice is None:
+        return {"ok": True, "partner_chose": False, "match": None}
+    match = choices_match(
+        {"category_id": body.category_id, "person_name": body.person_name},
+        {"category_id": partner_choice["category_id"], "person_name": partner_choice["person_name"]},
+    )
+    return {"ok": True, "partner_chose": True, "match": match}
 
 
 @app.get("/api/overleg")
@@ -251,8 +267,8 @@ def api_overleg(user: str = Depends(current_user)):
             "filename": r["filename"],
             "thumb_small": r["thumb_small"],
             "thumb_medium": r["thumb_medium"],
-            "mine": {"category": cats[a["category_id"]]["name"], "person_name": a["person_name"]},
-            "theirs": {"category": cats[b["category_id"]]["name"], "person_name": b["person_name"]},
+            "mine": {"category": cats[a["category_id"]]["name"], "color": cats[a["category_id"]]["color"], "person_name": a["person_name"]},
+            "theirs": {"category": cats[b["category_id"]]["name"], "color": cats[b["category_id"]]["color"], "person_name": b["person_name"]},
         })
     return result
 
