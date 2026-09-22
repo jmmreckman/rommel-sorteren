@@ -29,10 +29,18 @@ def stuur_mail(onderwerp: str, tekst: str) -> None:
         msg.set_content(tekst)
 
         context = ssl.create_default_context()
-        with smtplib.SMTP(host, port, timeout=10) as server:
-            server.starttls(context=context)
-            if gebruiker and wachtwoord:
-                server.login(gebruiker, wachtwoord)
-            server.send_message(msg)
+        if port == 465:
+            # Poort 465: direct versleuteld vanaf de eerste byte (SMTPS).
+            with smtplib.SMTP_SSL(host, port, timeout=10, context=context) as server:
+                if gebruiker and wachtwoord:
+                    server.login(gebruiker, wachtwoord)
+                server.send_message(msg)
+        else:
+            # Poort 587 (of 25): eerst plain, dan opwaarderen met STARTTLS.
+            with smtplib.SMTP(host, port, timeout=10) as server:
+                server.starttls(context=context)
+                if gebruiker and wachtwoord:
+                    server.login(gebruiker, wachtwoord)
+                server.send_message(msg)
     except Exception:
         logger.exception("Kon meldingsmail niet versturen")
