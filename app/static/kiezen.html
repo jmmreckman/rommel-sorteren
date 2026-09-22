@@ -86,6 +86,7 @@ async function submitChoice(categoryId, personName) {
     body: JSON.stringify({ photo_id: photo.id, category_id: categoryId, person_name: personName }),
   });
   if (queue.length <= 2) await aanvullen();
+  toonMijlpaal(result.total_choices);
 
   if (!result.partner_chose) {
     showToast('Bewaard, wachten op ' + partnerDisplay);

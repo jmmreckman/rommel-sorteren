@@ -63,3 +63,35 @@ function maakTagInput(photoId, tags) {
   input.addEventListener('click', (e) => e.stopPropagation());
   return input;
 }
+
+// Om de tien keuzes een leuk, wegklikbaar bemoedigingskaartje - roulerend
+// door een vaste lijst, weer van voren af aan zodra hij op is.
+const MIJLPAAL_BERICHTEN = [
+  'Lekker bezig! 💪🔥',
+  'Love you long time! 😘💕',
+  'Met dit tempo hebben we over een half jaar een lege zolder 🏠✨',
+  'Je bent op dreef! 🚀',
+  'Heerlijk wat een keuzes worden hier gemaakt 🙌',
+  'Toppertje, hou van jou ❤️',
+  'Lowen heeft gepoept 💩😂',
+  'Kusje 😘',
+  'Vergeet niet wat te drinken tussendoor 🥤',
+];
+
+function toonMijlpaal(totalChoices) {
+  if (!totalChoices || totalChoices % 10 !== 0) return;
+  const index = (totalChoices / 10 - 1) % MIJLPAAL_BERICHTEN.length;
+  const overlay = document.createElement('div');
+  overlay.className = 'mijlpaal-overlay';
+  overlay.innerHTML = `
+    <div class="mijlpaal-kaart">
+      <div class="mijlpaal-teller">🎉 ${totalChoices} keuzes gemaakt!</div>
+      <div class="mijlpaal-bericht">${MIJLPAAL_BERICHTEN[index]}</div>
+      <button class="btn">Doorgaan</button>
+    </div>
+  `;
+  const sluiten = () => overlay.remove();
+  overlay.querySelector('button').addEventListener('click', sluiten);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) sluiten(); });
+  document.body.appendChild(overlay);
+}

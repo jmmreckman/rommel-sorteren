@@ -309,13 +309,16 @@ def api_choice(body: ChoiceIn, user: str = Depends(current_user)):
             "SELECT category_id, person_name FROM choices WHERE photo_id=? AND user=?",
             (body.photo_id, partner),
         ).fetchone()
+        total_choices = conn.execute(
+            "SELECT COUNT(*) c FROM choices WHERE user=?", (user,)
+        ).fetchone()["c"]
     if partner_choice is None:
-        return {"ok": True, "partner_chose": False, "match": None}
+        return {"ok": True, "partner_chose": False, "match": None, "total_choices": total_choices}
     match = choices_match(
         {"category_id": body.category_id, "person_name": body.person_name},
         {"category_id": partner_choice["category_id"], "person_name": partner_choice["person_name"]},
     )
-    return {"ok": True, "partner_chose": True, "match": match}
+    return {"ok": True, "partner_chose": True, "match": match, "total_choices": total_choices}
 
 
 @app.get("/api/overleg")
@@ -366,7 +369,10 @@ def api_overleg_adopt(photo_id: int, user: str = Depends(current_user)):
                  category_id=excluded.category_id, person_name=excluded.person_name, updated_at=datetime('now')""",
             (photo_id, user, partner_choice["category_id"], partner_choice["person_name"]),
         )
-    return {"ok": True}
+        total_choices = conn.execute(
+            "SELECT COUNT(*) c FROM choices WHERE user=?", (user,)
+        ).fetchone()["c"]
+    return {"ok": True, "total_choices": total_choices}
 
 
 @app.get("/api/resultaten")
