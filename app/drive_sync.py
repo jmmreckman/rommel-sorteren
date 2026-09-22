@@ -1,12 +1,13 @@
 import io
 import logging
 import os
+import uuid
 from pathlib import Path
 
 import pillow_heif
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
+from googleapiclient.http import MediaIoBaseDownload
 from PIL import Image, ImageOps
 
 from .db import get_db
@@ -15,10 +16,12 @@ pillow_heif.register_heif_opener()  # zodat HEIC/HEIF-foto's (standaard op recen
 
 logger = logging.getLogger("rommel")
 
-# Volledige (niet alleen-lezen) toegang, nodig om ook foto's te kunnen
-# uploaden via de "foto toevoegen"-knop in de app. De service account kan
-# sowieso alleen bij de ene map die er expliciet mee gedeeld is.
-SCOPES = ["https://www.googleapis.com/auth/drive"]
+# Service accounts hebben geen eigen Drive-opslagquota, dus ze mogen geen
+# nieuwe bestanden aanmaken in andermans Drive (alleen met een betaald
+# Google Workspace-account via Shared Drives/OAuth-delegatie, niet met een
+# gewoon Gmail-account). Daarom blijft dit alleen-lezen: uploaden vanuit de
+# app zelf slaat de foto rechtstreeks lokaal op, zie upload_photo() hieronder.
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 THUMB_DIR = Path(__file__).resolve().parent.parent / "data" / "thumbs"
 SMALL_SIZE = (500, 500)
 MEDIUM_SIZE = (1400, 1400)
@@ -109,22 +112,15 @@ def sync_drive() -> dict:
 
 
 def upload_photo(raw: bytes, filename: str, content_type: str | None) -> dict:
-    """Upload een nieuwe foto rechtstreeks naar de gedeelde Drive-map en
-    registreer 'm meteen lokaal, zodat het toegewezen foto-nummer direct
-    teruggegeven kan worden (voor het opschrijven op het voorwerp)."""
-    folder_id = os.environ["DRIVE_FOLDER_ID"]
-    service = _drive_service()
-
-    media = MediaIoBaseUpload(io.BytesIO(raw), mimetype=content_type or "image/jpeg", resumable=False)
-    drive_file = service.files().create(
-        body={"name": filename or "foto.jpg", "parents": [folder_id]},
-        media_body=media,
-        fields="id, name, webViewLink",
-    ).execute()
+    """Voor foto's die rechtstreeks vanuit de app gemaakt worden: geen Drive
+    nodig, gewoon direct thumbnails maken en lokaal registreren, zodat het
+    toegewezen foto-nummer meteen teruggegeven kan worden (voor het
+    opschrijven op het voorwerp)."""
+    local_id = f"local:{uuid.uuid4().hex}"
 
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
-    small_path = THUMB_DIR / f"{drive_file['id']}_s.webp"
-    medium_path = THUMB_DIR / f"{drive_file['id']}_m.webp"
+    small_path = THUMB_DIR / f"{local_id.split(':')[1]}_s.webp"
+    medium_path = THUMB_DIR / f"{local_id.split(':')[1]}_m.webp"
     _make_thumb(raw, small_path, SMALL_SIZE)
     _make_thumb(raw, medium_path, MEDIUM_SIZE)
 
@@ -132,12 +128,12 @@ def upload_photo(raw: bytes, filename: str, content_type: str | None) -> dict:
         cur = conn.execute(
             """INSERT INTO photos (drive_file_id, filename, thumb_small, thumb_medium, drive_link)
                VALUES (?, ?, ?, ?, ?)""",
-            (drive_file["id"], drive_file["name"], f"thumbs/{small_path.name}",
-             f"thumbs/{medium_path.name}", drive_file.get("webViewLink")),
+            (local_id, filename or "foto.jpg", f"thumbs/{small_path.name}",
+             f"thumbs/{medium_path.name}", None),
         )
         photo_id = cur.lastrowid
 
-    return {"id": photo_id, "drive_file_id": drive_file["id"]}
+    return {"id": photo_id, "drive_file_id": local_id}
 
 
 if __name__ == "__main__":
