@@ -68,14 +68,38 @@ document.getElementById('annuleerbtn').addEventListener('click', () => {
   toonKaart('startkaart');
 });
 
+// Verkleint de foto in de browser zelf voor 'ie verstuurd wordt, zodat er
+// nooit een volledige camera-foto (vaak meerdere MB's) over het netwerk
+// hoeft - vooral fijn bij een zwak signaal.
+async function verkleinVoorUpload(file, maxAfmeting = 1600, kwaliteit = 0.85) {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    let { width, height } = bitmap;
+    if (Math.max(width, height) > maxAfmeting) {
+      const schaal = maxAfmeting / Math.max(width, height);
+      width = Math.round(width * schaal);
+      height = Math.round(height * schaal);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, width, height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', kwaliteit));
+    return blob || file;
+  } catch (e) {
+    return file; // verkleinen mislukt (oud toestel?) - upload dan gewoon het origineel
+  }
+}
+
 document.getElementById('uploadbtn').addEventListener('click', async () => {
   if (!gekozenBestand) return;
   const tags = document.getElementById('tagsinput').value.trim();
   toonKaart('wachtkaart');
 
   try {
+    const kleineFoto = await verkleinVoorUpload(gekozenBestand);
     const formData = new FormData();
-    formData.append('file', gekozenBestand);
+    formData.append('file', kleineFoto, 'foto.jpg');
     formData.append('tags', tags);
     const res = await fetch('/api/photos/upload', { method: 'POST', body: formData });
     if (res.status === 401) { location.href = '/login'; return; }
