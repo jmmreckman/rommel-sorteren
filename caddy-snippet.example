@@ -1,0 +1,10 @@
+# Toe te voegen aan het gedeelde Caddyfile (bv. /opt/kamerverhuur-scanner/deploy/Caddyfile
+# op deze VPS), naast de blokken voor steenhub.nl / kansen.steenhub.nl / gewicht.steenhub.nl.
+#
+# "rommel" is hier de servicenaam uit docker-compose.yml van dit project — dat werkt
+# alleen als deze container op hetzelfde Docker-netwerk zit als de Caddy-container
+# (zie het "deploy_default" netwerk in docker-compose.yml).
+
+rommel.steenhub.nl {
+    reverse_proxy rommel:8000
+}

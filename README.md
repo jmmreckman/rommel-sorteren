@@ -61,20 +61,28 @@ Test lokaal of het werkt: `curl http://127.0.0.1:8123/health` moet
 
 ## Stap 4 — rommel.steenhub.nl aan elkaar knopen
 
-1. **DNS**: zet bij je domeinregistrar (of waar je de DNS van steenhub.nl
-   beheert) een A-record voor `rommel` naar het IP-adres van je VPS
-   (hetzelfde IP als steenhub.nl gebruikt).
-2. **Nginx**: kopieer `nginx.conf.example` naar je nginx sites-config (zie
-   commentaar bovenin het bestand voor het pad), en herlaad nginx:
+Deze VPS gebruikt geen nginx, maar **Caddy** (draait als container, regelt
+HTTPS-certificaten automatisch). Het gedeelde Caddyfile staat op
+`/opt/kamerverhuur-scanner/deploy/Caddyfile`.
+
+1. **DNS**: voeg bij je domeinregistrar een CNAME- of A-record toe voor
+   `rommel` naar hetzelfde adres als steenhub.nl (zie `caddy-snippet.example`
+   voor de achtergrond).
+2. **Netwerk**: dit project moet op hetzelfde Docker-netwerk draaien als
+   Caddy (`deploy_default`) — dat staat al in `docker-compose.yml`. Na een
+   `git pull` gewoon opnieuw opstarten:
    ```bash
-   sudo nginx -t && sudo systemctl reload nginx
+   docker compose up -d --build
    ```
-3. **HTTPS-certificaat**: als je certbot al gebruikt voor steenhub.nl:
+3. **Caddyfile bijwerken**: voeg het blok uit `caddy-snippet.example` toe aan
+   `/opt/kamerverhuur-scanner/deploy/Caddyfile`, en herlaad Caddy zonder
+   downtime voor de andere sites:
    ```bash
-   sudo certbot --nginx -d rommel.steenhub.nl
+   docker exec deploy-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
    ```
 
-Klaar — rommel.steenhub.nl zou nu moeten werken.
+Klaar — rommel.steenhub.nl zou nu moeten werken (Caddy haalt vanzelf een
+Let's Encrypt-certificaat op zodra het DNS-record actief is).
 
 ## Dagelijks gebruik
 
