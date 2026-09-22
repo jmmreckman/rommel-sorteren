@@ -29,7 +29,8 @@ ze op en maakt er snelle thumbnails van.
 6. Open het downloaded JSON-bestand en kopieer het `client_email`-adres
    (ziet eruit als `rommel-sorteren@jouwproject.iam.gserviceaccount.com`).
 7. Ga terug naar de Drive-map, klik **Delen**, en deel de map met dat
-   e-mailadres als **Viewer** (alleen lezen is genoeg).
+   e-mailadres als **Editor** (niet Viewer — de app moet ook foto's kunnen
+   uploaden via de "Foto toevoegen"-knop).
 8. Open de map in de browser en kopieer het stuk uit de URL na
    `/folders/` — dat is je `DRIVE_FOLDER_ID`.
 
