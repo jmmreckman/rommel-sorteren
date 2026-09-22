@@ -12,7 +12,7 @@
     <a href="/">&larr; hoofdpagina</a>
   </div>
   <h1>🔎 Zoeken</h1>
-  <p class="muted">Typ een naam of tag (bv. "beker").</p>
+  <p class="muted">Typ een naam of tag (bv. "beker"), of laat leeg om alle foto's te zien.</p>
 
   <div class="card">
     <input type="text" id="zoekinput" placeholder="bv. beker"
@@ -23,6 +23,7 @@
   <div id="resultaten"></div>
   <div class="empty" id="leeg" style="display:none;">Niks gevonden.</div>
 </div>
+<div class="toast" id="toast"></div>
 <script src="/assets/app.js"></script>
 <script>
 const statusLabel = {
@@ -43,7 +44,6 @@ async function zoek() {
   const el = document.getElementById('resultaten');
   el.innerHTML = '';
   document.getElementById('leeg').style.display = 'none';
-  if (!q) return;
 
   let data;
   try {
@@ -63,6 +63,7 @@ async function zoek() {
   data.forEach(p => {
     const kaart = document.createElement('div');
     kaart.className = 'card';
+    kaart.style.position = 'relative';
     kaart.innerHTML = `
       <div style="display:flex; gap:12px;">
         <img src="/${p.thumb_small}" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:10px;flex-shrink:0;">
@@ -74,6 +75,15 @@ async function zoek() {
         </div>
       </div>
     `;
+    const del = document.createElement('button');
+    del.className = 'delete-overlay';
+    del.textContent = '×';
+    del.title = 'Foto verwijderen';
+    del.addEventListener('click', async () => {
+      if (!(await verwijderFoto(p.id))) return;
+      zoek();
+    });
+    kaart.appendChild(del);
     el.appendChild(kaart);
   });
 }
@@ -82,7 +92,8 @@ document.getElementById('zoekbtn').addEventListener('click', zoek);
 document.getElementById('zoekinput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') zoek();
 });
-document.getElementById('zoekinput').focus();
+
+zoek();
 </script>
 </body>
 </html>

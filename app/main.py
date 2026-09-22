@@ -252,15 +252,21 @@ def _describe_photo(conn, photo) -> dict:
 
 
 @app.get("/api/photos/search")
-def api_search_photos(q: str):
+def api_search_photos(q: str = ""):
     q = q.strip()
-    if not q:
-        return []
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM photos WHERE tags LIKE ? ORDER BY added_at DESC LIMIT 40",
-            (f"%{q}%",),
-        ).fetchall()
+        if not q:
+            # Leeg zoekveld: toon alles, ongeacht status - zodat ook foto's
+            # die nergens anders zichtbaar zijn (bv. alleen door jou al
+            # gekozen, partner nog niet) terug te vinden en te verwijderen zijn.
+            rows = conn.execute(
+                "SELECT * FROM photos ORDER BY added_at DESC LIMIT 500",
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM photos WHERE tags LIKE ? ORDER BY added_at DESC LIMIT 40",
+                (f"%{q}%",),
+            ).fetchall()
         return [_describe_photo(conn, r) for r in rows]
 
 
