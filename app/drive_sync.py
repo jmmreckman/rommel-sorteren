@@ -70,6 +70,7 @@ def sync_drive() -> dict:
 
     with get_db() as conn:
         existing = {row["drive_file_id"] for row in conn.execute("SELECT drive_file_id FROM photos")}
+        existing |= {row["drive_file_id"] for row in conn.execute("SELECT drive_file_id FROM deleted_drive_files")}
 
     added = 0
     skipped = 0

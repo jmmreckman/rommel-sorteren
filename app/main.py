@@ -32,9 +32,8 @@ async def run_sync():
 
 
 async def _periodic_sync_loop():
-    interval_minutes = int(os.environ.get("SYNC_INTERVAL_MINUTES", "15"))
+    interval_minutes = int(os.environ.get("SYNC_INTERVAL_MINUTES", "2"))
     while True:
-        await asyncio.sleep(interval_minutes * 60)
         try:
             result = await run_sync()
             logger.info("Automatische Drive-sync: %s", result)
@@ -43,6 +42,7 @@ async def _periodic_sync_loop():
                 "Automatische Drive-sync mislukt, probeer over %s minuten opnieuw",
                 interval_minutes,
             )
+        await asyncio.sleep(interval_minutes * 60)
 
 PUBLIC_PATHS = {"/login", "/health"}
 
@@ -202,6 +202,10 @@ def api_delete_photo(photo_id: int):
         if not row:
             raise HTTPException(404, "foto niet gevonden")
         conn.execute("DELETE FROM photos WHERE id=?", (photo_id,))
+        conn.execute(
+            "INSERT OR IGNORE INTO deleted_drive_files (drive_file_id) VALUES (?)",
+            (row["drive_file_id"],),
+        )
     for rel_path in (row["thumb_small"], row["thumb_medium"]):
         (DATA_DIR / rel_path).unlink(missing_ok=True)
     return {"ok": True}

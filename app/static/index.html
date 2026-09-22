@@ -29,13 +29,6 @@
     <p class="muted" id="stat-partner">—</p>
     <p class="muted" id="stat-resolved">—</p>
   </div>
-
-  <div class="card">
-    <h2>Nieuwe foto's ophalen</h2>
-    <p class="muted">Haalt nieuwe foto's op uit de gedeelde Google Drive-map.</p>
-    <button class="btn secondary" id="syncbtn">🔄 Ververs vanuit Drive</button>
-    <p class="muted" id="syncstatus"></p>
-  </div>
 </div>
 <div class="toast" id="toast"></div>
 <script src="/assets/app.js"></script>
@@ -65,21 +58,6 @@ async function laad() {
   }
 }
 laad();
-
-document.getElementById('syncbtn').addEventListener('click', async () => {
-  const btn = document.getElementById('syncbtn');
-  btn.disabled = true;
-  document.getElementById('syncstatus').textContent = 'Bezig met ophalen, dit kan even duren...';
-  try {
-    const r = await api('/api/sync', { method: 'POST' });
-    document.getElementById('syncstatus').textContent = `Klaar: ${r.added} nieuwe foto's toegevoegd.`;
-    laad();
-  } catch (e) {
-    document.getElementById('syncstatus').textContent = 'Mislukt: ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
-});
 </script>
 </body>
 </html>

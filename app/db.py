@@ -52,6 +52,13 @@ CREATE TABLE IF NOT EXISTS choices (
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(photo_id, user)
 );
+
+-- Onthoudt welke Drive-bestanden bewust verwijderd zijn, zodat de sync ze
+-- niet steeds opnieuw binnenhaalt zolang ze nog in de Drive-map staan.
+CREATE TABLE IF NOT EXISTS deleted_drive_files (
+    drive_file_id TEXT PRIMARY KEY,
+    deleted_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
