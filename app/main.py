@@ -387,7 +387,6 @@ def api_resultaten():
             "filename": r["filename"],
             "thumb_small": r["thumb_small"],
             "thumb_medium": r["thumb_medium"],
-            "drive_link": r["drive_link"],
             "person_name": r["name_a"],
             "tags": r["tags"],
         })

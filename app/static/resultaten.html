@@ -37,7 +37,7 @@ function toonGroep(i) {
   photos.forEach(p => {
     const fig = document.createElement('figure');
     const a = document.createElement('a');
-    a.href = p.drive_link || ('/' + p.thumb_medium);
+    a.href = '/' + p.thumb_medium;
     a.target = '_blank';
     a.rel = 'noopener';
     a.innerHTML = `<img src="/${p.thumb_small}" alt="${p.filename}">`;

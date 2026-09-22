@@ -32,7 +32,9 @@ async function verwijderFoto(photoId) {
   return true;
 }
 
-// Maakt een tags-invoerveld dat vanzelf opslaat zodra je 'm verlaat of Enter drukt.
+// Maakt een tags-invoerveld dat vanzelf opslaat: tijdens het typen (na een
+// korte pauze), en meteen bij verlaten of Enter. Zo kan een tag nooit meer
+// verloren gaan doordat je meteen daarna wegnavigeert.
 function maakTagInput(photoId, tags) {
   const input = document.createElement('input');
   input.type = 'text';
@@ -40,6 +42,7 @@ function maakTagInput(photoId, tags) {
   input.placeholder = 'tags toevoegen...';
   input.value = tags || '';
   input.dataset.lastSaved = tags || '';
+  let debounceTimer;
   const opslaan = async () => {
     const nieuw = input.value.trim();
     if (nieuw === input.dataset.lastSaved) return;
@@ -51,7 +54,11 @@ function maakTagInput(photoId, tags) {
       showToast('Opslaan mislukt');
     }
   };
-  input.addEventListener('blur', opslaan);
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(opslaan, 600);
+  });
+  input.addEventListener('blur', () => { clearTimeout(debounceTimer); opslaan(); });
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') input.blur(); });
   input.addEventListener('click', (e) => e.stopPropagation());
   return input;
