@@ -68,9 +68,8 @@ function catRow(items) {
 }
 
 async function adopt(photoId) {
-  const result = await api(`/api/overleg/${photoId}/adopt`, { method: 'POST' });
+  await api(`/api/overleg/${photoId}/adopt`, { method: 'POST' });
   showToast('Overgenomen');
-  toonMijlpaal(result.total_choices);
   laad();
 }
 
@@ -80,12 +79,11 @@ async function opnieuwKiezen(photoId, cat) {
     naam = prompt('Naam van wie het krijgt:');
     if (!naam) return;
   }
-  const result = await api('/api/choice', {
+  await api('/api/choice', {
     method: 'POST',
     body: JSON.stringify({ photo_id: photoId, category_id: cat.id, person_name: naam }),
   });
   showToast('Keuze aangepast');
-  toonMijlpaal(result.total_choices);
   laad();
 }
 
