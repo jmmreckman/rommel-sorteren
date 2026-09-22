@@ -4,13 +4,13 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, Request, Response, HTTPException, Depends, UploadFile, File
 from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .db import init_db, get_db, USERS, other_user, choices_match, CATEGORY_PALETTE
-from .drive_sync import sync_drive
+from .drive_sync import sync_drive, upload_photo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rommel")
@@ -211,6 +211,64 @@ def api_delete_photo(photo_id: int):
     return {"ok": True}
 
 
+@app.post("/api/photos/upload")
+async def api_upload_photo(file: UploadFile = File(...)):
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "leeg bestand")
+    loop = asyncio.get_event_loop()
+    try:
+        result = await loop.run_in_executor(None, upload_photo, raw, file.filename, file.content_type)
+    except Exception as e:
+        raise HTTPException(500, f"upload mislukt: {e}")
+    return result
+
+
+@app.get("/api/photos/{photo_id}/lookup")
+def api_lookup_photo(photo_id: int):
+    with get_db() as conn:
+        photo = conn.execute("SELECT * FROM photos WHERE id=?", (photo_id,)).fetchone()
+        if not photo:
+            raise HTTPException(404, "foto niet gevonden")
+        cats = {c["id"]: dict(c) for c in conn.execute("SELECT * FROM categories").fetchall()}
+        choices = {
+            row["user"]: row
+            for row in conn.execute("SELECT * FROM choices WHERE photo_id=?", (photo_id,)).fetchall()
+        }
+
+    def describe(user):
+        c = choices.get(user)
+        if not c:
+            return None
+        cat = cats.get(c["category_id"])
+        return {
+            "category": cat["name"] if cat else "?",
+            "color": cat["color"] if cat else "#888888",
+            "person_name": c["person_name"],
+        }
+
+    ayla = describe("ayla")
+    jurian = describe("jurian")
+    if ayla and jurian:
+        status = "definitief" if choices_match(
+            {"category_id": choices["ayla"]["category_id"], "person_name": choices["ayla"]["person_name"]},
+            {"category_id": choices["jurian"]["category_id"], "person_name": choices["jurian"]["person_name"]},
+        ) else "overleg"
+    elif ayla or jurian:
+        status = "wachten"
+    else:
+        status = "nog niks gekozen"
+
+    return {
+        "id": photo["id"],
+        "filename": photo["filename"],
+        "thumb_medium": photo["thumb_medium"],
+        "status": status,
+        "ayla": ayla,
+        "jurian": jurian,
+    }
+
+
 @app.get("/api/queue")
 def api_queue(limit: int = 6, user: str = Depends(current_user)):
     partner = other_user(user)
@@ -359,6 +417,8 @@ def spa(page: str):
         "kiezen": "kiezen.html",
         "overleg": "overleg.html",
         "resultaten": "resultaten.html",
+        "toevoegen": "toevoegen.html",
+        "zoek": "zoek.html",
     }
     filename = file_map.get(page.strip("/"))
     if not filename:

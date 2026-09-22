@@ -6,7 +6,7 @@ from pathlib import Path
 import pillow_heif
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseDownload
+from googleapiclient.http import MediaIoBaseDownload, MediaIoBaseUpload
 from PIL import Image, ImageOps
 
 from .db import get_db
@@ -15,7 +15,10 @@ pillow_heif.register_heif_opener()  # zodat HEIC/HEIF-foto's (standaard op recen
 
 logger = logging.getLogger("rommel")
 
-SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+# Volledige (niet alleen-lezen) toegang, nodig om ook foto's te kunnen
+# uploaden via de "foto toevoegen"-knop in de app. De service account kan
+# sowieso alleen bij de ene map die er expliciet mee gedeeld is.
+SCOPES = ["https://www.googleapis.com/auth/drive"]
 THUMB_DIR = Path(__file__).resolve().parent.parent / "data" / "thumbs"
 SMALL_SIZE = (500, 500)
 MEDIUM_SIZE = (1400, 1400)
@@ -103,6 +106,38 @@ def sync_drive() -> dict:
         added += 1
 
     return {"added": added, "skipped_already_synced": skipped}
+
+
+def upload_photo(raw: bytes, filename: str, content_type: str | None) -> dict:
+    """Upload een nieuwe foto rechtstreeks naar de gedeelde Drive-map en
+    registreer 'm meteen lokaal, zodat het toegewezen foto-nummer direct
+    teruggegeven kan worden (voor het opschrijven op het voorwerp)."""
+    folder_id = os.environ["DRIVE_FOLDER_ID"]
+    service = _drive_service()
+
+    media = MediaIoBaseUpload(io.BytesIO(raw), mimetype=content_type or "image/jpeg", resumable=False)
+    drive_file = service.files().create(
+        body={"name": filename or "foto.jpg", "parents": [folder_id]},
+        media_body=media,
+        fields="id, name, webViewLink",
+    ).execute()
+
+    THUMB_DIR.mkdir(parents=True, exist_ok=True)
+    small_path = THUMB_DIR / f"{drive_file['id']}_s.webp"
+    medium_path = THUMB_DIR / f"{drive_file['id']}_m.webp"
+    _make_thumb(raw, small_path, SMALL_SIZE)
+    _make_thumb(raw, medium_path, MEDIUM_SIZE)
+
+    with get_db() as conn:
+        cur = conn.execute(
+            """INSERT INTO photos (drive_file_id, filename, thumb_small, thumb_medium, drive_link)
+               VALUES (?, ?, ?, ?, ?)""",
+            (drive_file["id"], drive_file["name"], f"thumbs/{small_path.name}",
+             f"thumbs/{medium_path.name}", drive_file.get("webViewLink")),
+        )
+        photo_id = cur.lastrowid
+
+    return {"id": photo_id, "drive_file_id": drive_file["id"]}
 
 
 if __name__ == "__main__":

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Foto toevoegen — Rommel Sorteren</title>
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a href="/">&larr; hoofdpagina</a>
+    <span class="muted" id="teller">0 foto's deze sessie</span>
+  </div>
+  <h1>📸 Foto toevoegen</h1>
+  <p class="muted">Maak een foto van het voorwerp. Zodra hij geupload is, krijg je meteen een nummer — schrijf dat op tape en plak het op het voorwerp.</p>
+
+  <div class="card" id="nummerkaart" style="display:none; text-align:center;">
+    <p class="muted" style="margin-bottom:4px;">Foto-nummer</p>
+    <div id="nummer" style="font-size:3.5rem; font-weight:800; color:var(--accent);">—</div>
+  </div>
+
+  <div class="card" id="wachtkaart" style="display:none; text-align:center;">
+    <p class="muted">Bezig met uploaden...</p>
+  </div>
+
+  <div class="card" id="foutkaart" style="display:none; text-align:center; color:var(--cat4);"></div>
+
+  <label class="btn" for="fotoinput" style="display:block; text-align:center;">📷 Volgende foto maken</label>
+  <input type="file" id="fotoinput" accept="image/*" capture="environment" style="display:none;">
+</div>
+<div class="toast" id="toast"></div>
+<script src="/assets/app.js"></script>
+<script>
+let count = 0;
+const input = document.getElementById('fotoinput');
+
+input.addEventListener('change', async () => {
+  const file = input.files[0];
+  if (!file) return;
+
+  document.getElementById('nummerkaart').style.display = 'none';
+  document.getElementById('foutkaart').style.display = 'none';
+  document.getElementById('wachtkaart').style.display = 'block';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/photos/upload', { method: 'POST', body: formData });
+    if (res.status === 401) { location.href = '/login'; return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || res.statusText);
+    }
+    const data = await res.json();
+    count++;
+    document.getElementById('teller').textContent = `${count} foto's deze sessie`;
+    document.getElementById('nummer').textContent = '#' + data.id;
+    document.getElementById('nummerkaart').style.display = 'block';
+  } catch (e) {
+    document.getElementById('foutkaart').textContent = 'Uploaden mislukt: ' + e.message;
+    document.getElementById('foutkaart').style.display = 'block';
+  } finally {
+    document.getElementById('wachtkaart').style.display = 'none';
+    input.value = '';
+  }
+});
+</script>
+</body>
+</html>
