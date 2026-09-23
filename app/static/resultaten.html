@@ -12,12 +12,15 @@
     <a href="/">&larr; hoofdpagina</a>
   </div>
   <h1>✅ Resultaten</h1>
+  <p class="muted" style="margin-top:-8px;">Tik op een foto om de categorie alsnog aan te passen.</p>
   <div class="tabs" id="tabs"></div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="leeg" style="display:none;">Nog geen definitieve foto's in deze categorie.</div>
 </div>
+<div class="toast" id="toast"></div>
 <script src="/assets/app.js"></script>
 <script>
+let categories = [];
 let groepen = [];
 let actief = 0;
 
@@ -36,12 +39,13 @@ function toonGroep(i) {
   document.getElementById('leeg').style.display = photos.length ? 'none' : 'block';
   photos.forEach(p => {
     const fig = document.createElement('figure');
-    const a = document.createElement('a');
-    a.href = '/' + p.thumb_medium;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.innerHTML = `<img src="/${p.thumb_small}" alt="${p.filename}">`;
-    fig.appendChild(a);
+
+    const img = document.createElement('img');
+    img.src = '/' + p.thumb_small;
+    img.alt = p.filename;
+    img.style.cursor = 'pointer';
+    img.addEventListener('click', () => openCategoriePicker(p));
+    fig.appendChild(img);
 
     const del = document.createElement('button');
     del.className = 'delete-overlay';
@@ -51,11 +55,7 @@ function toonGroep(i) {
       e.preventDefault();
       e.stopPropagation();
       if (!(await verwijderFoto(p.id))) return;
-      groepen = await api('/api/resultaten');
-      document.querySelectorAll('#tabs button').forEach((b, idx) => {
-        b.textContent = `${groepen[idx].category.name} (${groepen[idx].photos.length})`;
-      });
-      toonGroep(actief);
+      await herlaad();
     });
     fig.appendChild(del);
     fig.appendChild(maakTagInput(p.id, p.tags));
@@ -69,7 +69,64 @@ function toonGroep(i) {
   });
 }
 
+function openCategoriePicker(photo) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const kaart = document.createElement('div');
+  kaart.className = 'modal-kaart';
+  kaart.innerHTML = `<img src="/${photo.thumb_medium}" alt="">`;
+
+  const grid = document.createElement('div');
+  grid.className = 'catgrid';
+  categories.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'catbtn';
+    b.style.background = c.color;
+    b.textContent = c.name;
+    b.addEventListener('click', async () => {
+      let naam = null;
+      if (c.requires_name) {
+        naam = prompt('Naam van wie het krijgt:');
+        if (!naam) return;
+      }
+      try {
+        await api(`/api/photos/${photo.id}/category`, {
+          method: 'PATCH',
+          body: JSON.stringify({ category_id: c.id, person_name: naam }),
+        });
+        showToast('Categorie aangepast');
+        overlay.remove();
+        await herlaad();
+      } catch (e) {
+        alert('Aanpassen mislukt: ' + e.message);
+      }
+    });
+    grid.appendChild(b);
+  });
+  kaart.appendChild(grid);
+
+  const sluit = document.createElement('div');
+  sluit.className = 'modal-sluiten';
+  sluit.textContent = 'Annuleren';
+  sluit.addEventListener('click', () => overlay.remove());
+  kaart.appendChild(sluit);
+
+  overlay.appendChild(kaart);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function herlaad() {
+  groepen = await api('/api/resultaten');
+  document.querySelectorAll('#tabs button').forEach((b, idx) => {
+    b.textContent = `${groepen[idx].category.name} (${groepen[idx].photos.length})`;
+  });
+  toonGroep(actief);
+}
+
 (async function init() {
+  categories = await api('/api/categories');
   groepen = await api('/api/resultaten');
   const tabs = document.getElementById('tabs');
   groepen.forEach((g, i) => {

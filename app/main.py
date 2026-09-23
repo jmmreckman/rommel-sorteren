@@ -212,6 +212,34 @@ def api_update_tags(photo_id: int, body: TagsIn):
     return {"ok": True, "tags": body.tags.strip()}
 
 
+class PhotoCategoryIn(BaseModel):
+    category_id: int
+    person_name: str | None = None
+
+
+@app.patch("/api/photos/{photo_id}/category")
+def api_update_photo_category(photo_id: int, body: PhotoCategoryIn):
+    """Herzet de categorie voor beide gebruikers tegelijk - voor als jullie
+    er allebei al over eens waren maar het bij nader inzien toch anders
+    moet, zonder dat het via het overleg hoeft."""
+    with get_db() as conn:
+        photo = conn.execute("SELECT id FROM photos WHERE id=?", (photo_id,)).fetchone()
+        if not photo:
+            raise HTTPException(404, "foto niet gevonden")
+        cat = conn.execute("SELECT id FROM categories WHERE id=?", (body.category_id,)).fetchone()
+        if not cat:
+            raise HTTPException(400, "onbekende categorie")
+        for gebruiker in USERS:
+            conn.execute(
+                """INSERT INTO choices (photo_id, user, category_id, person_name, updated_at)
+                   VALUES (?, ?, ?, ?, datetime('now'))
+                   ON CONFLICT(photo_id, user) DO UPDATE SET
+                     category_id=excluded.category_id, person_name=excluded.person_name, updated_at=datetime('now')""",
+                (photo_id, gebruiker, body.category_id, body.person_name),
+            )
+    return {"ok": True}
+
+
 @app.post("/api/photos/upload")
 async def api_upload_photo(file: UploadFile = File(...), tags: str = Form("")):
     raw = await file.read()
