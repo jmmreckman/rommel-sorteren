@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response, HTTPException, Depends, UploadFile, File, Form
@@ -20,6 +21,18 @@ APP_DIR = Path(__file__).resolve().parent
 DATA_DIR = APP_DIR.parent / "data"
 
 app = FastAPI(title="Rommel Sorteren")
+
+# Verandert bij elke herstart (dus bij elke deploy), zodat style.css/app.js
+# een nieuwe URL krijgen en de browser ze nooit uit een oude cache pakt.
+ASSET_VERSION = str(int(time.time()))
+
+
+def _serve_html(filename: str) -> Response:
+    html = (APP_DIR / "static" / filename).read_text()
+    html = html.replace("/assets/style.css", f"/assets/style.css?v={ASSET_VERSION}")
+    html = html.replace("/assets/app.js", f"/assets/app.js?v={ASSET_VERSION}")
+    return Response(html, media_type="text/html")
+
 
 PUBLIC_PATHS = {"/login", "/health", "/garage-sale"}
 
@@ -81,7 +94,7 @@ def health():
 
 @app.get("/login")
 def login_page():
-    return Response((APP_DIR / "static" / "login.html").read_text(), media_type="text/html")
+    return _serve_html("login.html")
 
 
 @app.post("/login")
@@ -518,4 +531,4 @@ def spa(page: str):
     filename = file_map.get(page.strip("/"))
     if not filename:
         raise HTTPException(404)
-    return Response((APP_DIR / "static" / filename).read_text(), media_type="text/html")
+    return _serve_html(filename)
