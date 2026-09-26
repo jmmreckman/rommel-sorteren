@@ -88,13 +88,18 @@ function openCategoriePicker(photo) {
       if (c.requires_name) {
         naam = prompt('Naam van wie het krijgt:');
         if (!naam) return;
+      } else if (c.requires_note) {
+        naam = prompt('Toelichting:');
+        if (!naam) return;
       }
       try {
         const result = await api('/api/choice', {
           method: 'POST',
           body: JSON.stringify({ photo_id: photo.id, category_id: c.id, person_name: naam }),
         });
-        if (result.partner_chose && !result.match) {
+        if (result.definitief && result.override) {
+          showToast(`Verplaatst naar ${c.name} — direct definitief`);
+        } else if (result.partner_chose && !result.match) {
           showToast('Verplaatst — maar staat nu in het overleg, jullie zijn het niet meer eens');
         } else {
           showToast('Verplaatst naar ' + c.name);

@@ -55,6 +55,7 @@
 let categories = [];
 let queue = [];
 let pendingCategoryId = null;
+let pendingIsNote = false;
 let partnerDisplay = '';
 
 function renderCatgrid() {
@@ -107,11 +108,15 @@ function renderCategorielijst() {
 }
 
 function chooseCategory(cat) {
-  if (cat.requires_name) {
+  if (cat.requires_name || cat.requires_note) {
     pendingCategoryId = cat.id;
+    pendingIsNote = !!cat.requires_note;
+    const input = document.getElementById('naaminput');
+    input.placeholder = pendingIsNote ? 'Toelichting (wat is het, waarom?)' : 'Naam van wie het krijgt';
+    if (pendingIsNote) { input.removeAttribute('list'); } else { input.setAttribute('list', 'naamlijst'); }
     document.getElementById('namebox').classList.add('show');
-    document.getElementById('naaminput').value = '';
-    document.getElementById('naaminput').focus();
+    input.value = '';
+    input.focus();
   } else {
     submitChoice(cat.id, null);
   }
@@ -126,18 +131,26 @@ async function submitChoice(categoryId, personName) {
   });
   if (queue.length <= 2) await aanvullen();
 
+  if (result.definitief) {
+    toonMatchBanner(true, result.override);
+    setTimeout(toonVolgende, 1500);
+    return;
+  }
   if (!result.partner_chose) {
     showToast('Bewaard, wachten op ' + partnerDisplay);
     toonVolgende();
     return;
   }
-  toonMatchBanner(result.match);
+  toonMatchBanner(result.match, false);
   setTimeout(toonVolgende, 1500);
 }
 
-function toonMatchBanner(match) {
+function toonMatchBanner(match, override) {
   const el = document.getElementById('matchbanner');
-  if (match) {
+  if (override) {
+    el.textContent = '✅ Direct definitief!';
+    el.className = 'matchbanner match';
+  } else if (match) {
     el.textContent = '❤️ Jullie matchen!';
     el.className = 'matchbanner match';
   } else {
@@ -149,9 +162,9 @@ function toonMatchBanner(match) {
 }
 
 document.getElementById('bevestignaam').addEventListener('click', () => {
-  const naam = document.getElementById('naaminput').value.trim();
-  if (!naam) { alert('Vul een naam in.'); return; }
-  submitChoice(pendingCategoryId, naam);
+  const waarde = document.getElementById('naaminput').value.trim();
+  if (!waarde) { alert(pendingIsNote ? 'Vul een toelichting in.' : 'Vul een naam in.'); return; }
+  submitChoice(pendingCategoryId, waarde);
 });
 
 function toonVolgende() {
@@ -196,7 +209,9 @@ async function laadNamen() {
   try {
     const resultaten = await api('/api/resultaten');
     const namen = new Set();
-    resultaten.forEach(g => g.photos.forEach(p => { if (p.person_name) namen.add(p.person_name); }));
+    resultaten
+      .filter(g => g.category.requires_name)
+      .forEach(g => g.photos.forEach(p => { if (p.person_name) namen.add(p.person_name); }));
     document.getElementById('naamlijst').innerHTML =
       [...namen].map(n => `<option value="${n}">`).join('');
   } catch (e) {}

@@ -16,11 +16,12 @@ CATEGORY_PALETTE = [
 ]
 
 DEFAULT_CATEGORIES = [
-    # (naam, vraagt om een naam erbij, volgorde)
-    ("Kringloop / rommelmarkt", 0, 1),
-    ("Zelf bewaren", 0, 2),
-    ("Naar vrienden/familie", 1, 3),
-    ("Grofvuil / milieuplein", 0, 4),
+    # (naam, vraagt om een naam erbij, vraagt om een toelichting, overrulet de partner, volgorde)
+    ("Kringloop / rommelmarkt", 0, 0, 0, 1),
+    ("Zelf bewaren", 0, 0, 0, 2),
+    ("Naar vrienden/familie", 1, 0, 0, 3),
+    ("Grofvuil / milieuplein", 0, 0, 0, 4),
+    ("Overig", 0, 1, 1, 5),
 ]
 
 SCHEMA = """
@@ -28,6 +29,8 @@ CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     requires_name INTEGER NOT NULL DEFAULT 0,
+    requires_note INTEGER NOT NULL DEFAULT 0,
+    overrules INTEGER NOT NULL DEFAULT 0,
     sort_order INTEGER NOT NULL DEFAULT 0,
     color TEXT NOT NULL DEFAULT '#888888',
     garage_sale INTEGER NOT NULL DEFAULT 0,
@@ -88,17 +91,35 @@ def init_db():
         cat_cols = {row["name"] for row in conn.execute("PRAGMA table_info(categories)")}
         if "garage_sale" not in cat_cols:
             conn.execute("ALTER TABLE categories ADD COLUMN garage_sale INTEGER NOT NULL DEFAULT 0")
+        if "requires_note" not in cat_cols:
+            conn.execute("ALTER TABLE categories ADD COLUMN requires_note INTEGER NOT NULL DEFAULT 0")
+        if "overrules" not in cat_cols:
+            conn.execute("ALTER TABLE categories ADD COLUMN overrules INTEGER NOT NULL DEFAULT 0")
         conn.execute("DROP TABLE IF EXISTS deleted_drive_files")
         existing = conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"]
         if existing == 0:
             seeded = [
-                (name, requires_name, order, CATEGORY_PALETTE[i % len(CATEGORY_PALETTE)])
-                for i, (name, requires_name, order) in enumerate(DEFAULT_CATEGORIES)
+                (name, requires_name, requires_note, overrules, order,
+                 CATEGORY_PALETTE[i % len(CATEGORY_PALETTE)])
+                for i, (name, requires_name, requires_note, overrules, order) in enumerate(DEFAULT_CATEGORIES)
             ]
             conn.executemany(
-                "INSERT INTO categories (name, requires_name, sort_order, color) VALUES (?, ?, ?, ?)",
+                """INSERT INTO categories (name, requires_name, requires_note, overrules, sort_order, color)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 seeded,
             )
+        else:
+            # bestaande installatie: voeg de nieuwe "Overig" categorie toe als hij er nog niet is
+            overig = conn.execute("SELECT id FROM categories WHERE LOWER(name)=LOWER(?)", ("Overig",)).fetchone()
+            if not overig:
+                next_order = conn.execute("SELECT COALESCE(MAX(sort_order),0)+1 n FROM categories").fetchone()["n"]
+                count = conn.execute("SELECT COUNT(*) c FROM categories").fetchone()["c"]
+                color = CATEGORY_PALETTE[count % len(CATEGORY_PALETTE)]
+                conn.execute(
+                    """INSERT INTO categories (name, requires_name, requires_note, overrules, sort_order, color)
+                       VALUES ('Overig', 0, 1, 1, ?, ?)""",
+                    (next_order, color),
+                )
 
 
 def other_user(user: str) -> str:

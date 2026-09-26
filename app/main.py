@@ -267,7 +267,11 @@ def _describe_photo(conn, photo) -> dict:
 
     ayla = describe("ayla")
     jurian = describe("jurian")
-    if ayla and jurian:
+    override_ayla = "ayla" in choices and bool(cats.get(choices["ayla"]["category_id"], {}).get("overrules"))
+    override_jurian = "jurian" in choices and bool(cats.get(choices["jurian"]["category_id"], {}).get("overrules"))
+    if override_ayla or override_jurian:
+        status = "definitief"
+    elif ayla and jurian:
         status = "definitief" if choices_match(
             {"category_id": choices["ayla"]["category_id"], "person_name": choices["ayla"]["person_name"]},
             {"category_id": choices["jurian"]["category_id"], "person_name": choices["jurian"]["person_name"]},
@@ -362,13 +366,33 @@ def api_choice(body: ChoiceIn, user: str = Depends(current_user)):
             "SELECT COUNT(*) c FROM choices WHERE user=?", (user,)
         ).fetchone()["c"]
     _meld_mijlpaal(user, total_choices)
+
+    # Een "overrules"-categorie (bv. Overig) maakt een foto direct definitief
+    # zodra 1 van beide dit kiest, ongeacht wat de ander (al) gekozen heeft.
+    override = bool(cat["overrules"])
+    if partner_choice is not None and not override:
+        with get_db() as conn:
+            partner_cat = conn.execute(
+                "SELECT overrules FROM categories WHERE id=?", (partner_choice["category_id"],),
+            ).fetchone()
+        override = bool(partner_cat and partner_cat["overrules"])
+
     if partner_choice is None:
-        return {"ok": True, "partner_chose": False, "match": None, "total_choices": total_choices}
-    match = choices_match(
+        if override:
+            return {"ok": True, "partner_chose": False, "match": True, "definitief": True,
+                     "override": True, "total_choices": total_choices}
+        return {"ok": True, "partner_chose": False, "match": None, "definitief": False,
+                "override": False, "total_choices": total_choices}
+
+    normal_match = choices_match(
         {"category_id": body.category_id, "person_name": body.person_name},
         {"category_id": partner_choice["category_id"], "person_name": partner_choice["person_name"]},
     )
-    return {"ok": True, "partner_chose": True, "match": match, "total_choices": total_choices}
+    return {
+        "ok": True, "partner_chose": True,
+        "match": normal_match, "definitief": override or normal_match,
+        "override": override, "total_choices": total_choices,
+    }
 
 
 @app.get("/api/overleg")
@@ -388,6 +412,8 @@ def api_overleg(user: str = Depends(current_user)):
     for r in rows:
         a = {"category_id": r["cat_a"], "person_name": r["name_a"]}
         b = {"category_id": r["cat_j"], "person_name": r["name_j"]}
+        if cats[a["category_id"]]["overrules"] or cats[b["category_id"]]["overrules"]:
+            continue  # al definitief via een "overrules"-categorie, hoort niet meer in het overleg
         if choices_match(a, b):
             continue
         result.append({
@@ -430,27 +456,41 @@ def api_overleg_adopt(photo_id: int, user: str = Depends(current_user)):
 def api_resultaten():
     with get_db() as conn:
         cats = conn.execute("SELECT * FROM categories ORDER BY sort_order, id").fetchall()
+        cat_overrules = {c["id"]: bool(c["overrules"]) for c in cats}
         rows = conn.execute(
             """SELECT p.*, ca.category_id cat_a, ca.person_name name_a, cj.category_id cat_j, cj.person_name name_j
                FROM photos p
-               JOIN choices ca ON ca.photo_id = p.id AND ca.user = 'ayla'
-               JOIN choices cj ON cj.photo_id = p.id AND cj.user = 'jurian'
+               LEFT JOIN choices ca ON ca.photo_id = p.id AND ca.user = 'ayla'
+               LEFT JOIN choices cj ON cj.photo_id = p.id AND cj.user = 'jurian'
                ORDER BY p.added_at ASC"""
         ).fetchall()
     grouped = {c["id"]: {"category": dict(c), "photos": []} for c in cats}
     for r in rows:
-        a = {"category_id": r["cat_a"], "person_name": r["name_a"]}
-        b = {"category_id": r["cat_j"], "person_name": r["name_j"]}
-        if not choices_match(a, b):
+        cat_a, cat_j = r["cat_a"], r["cat_j"]
+        # Een "overrules"-categorie (bv. Overig) wint altijd, ook als de
+        # ander niks of iets anders koos, of nog helemaal niks koos.
+        override_a = cat_a is not None and cat_overrules.get(cat_a)
+        override_j = cat_j is not None and cat_overrules.get(cat_j)
+        if override_a or override_j:
+            final_cat = cat_a if override_a else cat_j
+            note = r["name_a"] if override_a else r["name_j"]
+        elif cat_a is None or cat_j is None:
+            continue  # nog niet allebei gekozen, en geen overrules -> nog niet definitief
+        else:
+            a = {"category_id": cat_a, "person_name": r["name_a"]}
+            b = {"category_id": cat_j, "person_name": r["name_j"]}
+            if not choices_match(a, b):
+                continue
+            final_cat = cat_a
+            note = r["name_a"]
+        if final_cat not in grouped:
             continue
-        if r["cat_a"] not in grouped:
-            continue
-        grouped[r["cat_a"]]["photos"].append({
+        grouped[final_cat]["photos"].append({
             "id": r["id"],
             "filename": r["filename"],
             "thumb_small": r["thumb_small"],
             "thumb_medium": r["thumb_medium"],
-            "person_name": r["name_a"],
+            "person_name": note,
             "tags": r["tags"],
         })
     return list(grouped.values())
@@ -459,21 +499,33 @@ def api_resultaten():
 @app.get("/api/garage-sale")
 def api_garage_sale():
     with get_db() as conn:
-        garage_cats = {row["id"] for row in conn.execute("SELECT id FROM categories WHERE garage_sale=1")}
+        all_cats = {c["id"]: dict(c) for c in conn.execute("SELECT * FROM categories").fetchall()}
+        garage_cats = {cid for cid, c in all_cats.items() if c["garage_sale"]}
         if not garage_cats:
             return []
         rows = conn.execute(
             """SELECT p.*, ca.category_id cat_a, ca.person_name name_a, cj.category_id cat_j, cj.person_name name_j
                FROM photos p
-               JOIN choices ca ON ca.photo_id = p.id AND ca.user = 'ayla'
-               JOIN choices cj ON cj.photo_id = p.id AND cj.user = 'jurian'
+               LEFT JOIN choices ca ON ca.photo_id = p.id AND ca.user = 'ayla'
+               LEFT JOIN choices cj ON cj.photo_id = p.id AND cj.user = 'jurian'
                ORDER BY p.added_at ASC"""
         ).fetchall()
         result = []
         for r in rows:
-            a = {"category_id": r["cat_a"], "person_name": r["name_a"]}
-            b = {"category_id": r["cat_j"], "person_name": r["name_j"]}
-            if not choices_match(a, b) or r["cat_a"] not in garage_cats:
+            cat_a, cat_j = r["cat_a"], r["cat_j"]
+            override_a = cat_a is not None and all_cats.get(cat_a, {}).get("overrules")
+            override_j = cat_j is not None and all_cats.get(cat_j, {}).get("overrules")
+            if override_a or override_j:
+                final_cat = cat_a if override_a else cat_j
+            elif cat_a is None or cat_j is None:
+                continue
+            else:
+                a = {"category_id": cat_a, "person_name": r["name_a"]}
+                b = {"category_id": cat_j, "person_name": r["name_j"]}
+                if not choices_match(a, b):
+                    continue
+                final_cat = cat_a
+            if final_cat not in garage_cats:
                 continue
             interesse = [
                 row["name"] for row in conn.execute(

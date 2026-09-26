@@ -78,12 +78,15 @@ async function opnieuwKiezen(photoId, cat) {
   if (cat.requires_name) {
     naam = prompt('Naam van wie het krijgt:');
     if (!naam) return;
+  } else if (cat.requires_note) {
+    naam = prompt('Toelichting:');
+    if (!naam) return;
   }
-  await api('/api/choice', {
+  const result = await api('/api/choice', {
     method: 'POST',
     body: JSON.stringify({ photo_id: photoId, category_id: cat.id, person_name: naam }),
   });
-  showToast('Keuze aangepast');
+  showToast(result.override ? `Keuze aangepast — ${cat.name} is direct definitief` : 'Keuze aangepast');
   laad();
 }
 
