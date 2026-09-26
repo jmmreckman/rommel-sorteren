@@ -75,15 +75,14 @@ function openCategoriePicker(photo) {
 
   const kaart = document.createElement('div');
   kaart.className = 'modal-kaart';
-  kaart.innerHTML = `<img src="/${photo.thumb_medium}" alt="">`;
+  kaart.innerHTML = `<h2 style="margin-top:0;">Verplaatsen naar:</h2>`;
 
-  const grid = document.createElement('div');
-  grid.className = 'catgrid';
+  const lijst = document.createElement('div');
   categories.forEach(c => {
     const b = document.createElement('button');
-    b.className = 'catbtn';
-    b.style.background = c.color;
-    b.textContent = c.name;
+    b.className = 'btn secondary';
+    b.style.textAlign = 'left';
+    b.innerHTML = `<span class="dot" style="background:${c.color}"></span> ${c.name}`;
     b.addEventListener('click', async () => {
       let naam = null;
       if (c.requires_name) {
@@ -91,20 +90,24 @@ function openCategoriePicker(photo) {
         if (!naam) return;
       }
       try {
-        await api(`/api/photos/${photo.id}/category`, {
-          method: 'PATCH',
-          body: JSON.stringify({ category_id: c.id, person_name: naam }),
+        const result = await api('/api/choice', {
+          method: 'POST',
+          body: JSON.stringify({ photo_id: photo.id, category_id: c.id, person_name: naam }),
         });
-        showToast('Categorie aangepast');
+        if (result.partner_chose && !result.match) {
+          showToast('Verplaatst — maar staat nu in het overleg, jullie zijn het niet meer eens');
+        } else {
+          showToast('Verplaatst naar ' + c.name);
+        }
         overlay.remove();
         await herlaad();
       } catch (e) {
-        alert('Aanpassen mislukt: ' + e.message);
+        alert('Verplaatsen mislukt: ' + e.message);
       }
     });
-    grid.appendChild(b);
+    lijst.appendChild(b);
   });
-  kaart.appendChild(grid);
+  kaart.appendChild(lijst);
 
   const sluit = document.createElement('div');
   sluit.className = 'modal-sluiten';
