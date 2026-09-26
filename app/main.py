@@ -46,14 +46,23 @@ async def require_login(request: Request, call_next):
     path = request.url.path
     if (path in PUBLIC_PATHS or path.startswith("/assets/") or path.startswith("/thumbs/")
             or path.startswith("/api/garage-sale")):
-        return await call_next(request)
+        response = await call_next(request)
+        if not path.startswith("/thumbs/"):
+            # HTML/JS/CSS wijzigen regelmatig tijdens ontwikkeling - nooit
+            # laten cachen, anders zie je soms een oude versie van de app.
+            # Thumbnails zelf veranderen nooit (vast bestandsnaam), die mogen
+            # gewoon lang gecached blijven.
+            response.headers["Cache-Control"] = "no-store"
+        return response
     user = _parse_session(request.cookies.get("session"))
     if user is None:
         if path.startswith("/api/"):
             return JSONResponse({"error": "niet ingelogd"}, status_code=401)
         return RedirectResponse("/login")
     request.state.user = user
-    return await call_next(request)
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def current_user(request: Request) -> str:
